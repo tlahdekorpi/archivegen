@@ -12,11 +12,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/multimfi/archivegen/archive"
-	"github.com/multimfi/archivegen/archive/cpio"
-	"github.com/multimfi/archivegen/archive/tar"
-	"github.com/multimfi/archivegen/config"
-	"github.com/multimfi/archivegen/tree"
+	"github.com/tlahdekorpi/archivegen/archive"
+	"github.com/tlahdekorpi/archivegen/archive/cpio"
+	"github.com/tlahdekorpi/archivegen/archive/tar"
+	"github.com/tlahdekorpi/archivegen/config"
+	"github.com/tlahdekorpi/archivegen/tree"
 )
 
 var (

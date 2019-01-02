@@ -8,7 +8,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/multimfi/archivegen/elf"
+	"github.com/tlahdekorpi/archivegen/elf"
 )
 
 const (

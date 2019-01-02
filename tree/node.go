@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/multimfi/archivegen/archive"
-	"github.com/multimfi/archivegen/config"
+	"github.com/tlahdekorpi/archivegen/archive"
+	"github.com/tlahdekorpi/archivegen/config"
 )
 
 type Node struct {

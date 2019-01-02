@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/multimfi/archivegen/archive"
-	"github.com/multimfi/archivegen/config"
+	"github.com/tlahdekorpi/archivegen/archive"
+	"github.com/tlahdekorpi/archivegen/config"
 )
 
 func writeFile(w archive.Writer, src, dst string, mode, uid, gid int) error {

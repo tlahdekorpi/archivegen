@@ -3,8 +3,8 @@ package cpio
 import (
 	"io"
 
-	"github.com/multimfi/archivegen/archive"
-	"github.com/multimfi/archivegen/cpio"
+	"github.com/tlahdekorpi/archivegen/archive"
+	"github.com/tlahdekorpi/archivegen/cpio"
 )
 
 const max32 = int64(^uint32(0))

@@ -5,7 +5,7 @@ import (
 
 	"archive/tar"
 
-	"github.com/multimfi/archivegen/archive"
+	"github.com/tlahdekorpi/archivegen/archive"
 )
 
 type writer struct {
