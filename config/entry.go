@@ -236,7 +236,7 @@ func (e entry) pUser() (*int, error) {
 }
 
 func (e entry) pGroup() (*int, error) {
-	if !e.isSet(e.typeOffset(idxUser)) {
+	if !e.isSet(e.typeOffset(idxGroup)) {
 		return nil, nil
 	}
 	r, err := e.Group()

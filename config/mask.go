@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"regexp"
 	"strconv"
 )
@@ -22,58 +23,80 @@ const (
 	idxMaskGid    = 5
 )
 
+var (
+	errInvalidIndex = errors.New("mask: invalid index")
+	errIndexOOB     = errors.New("mask: index out of bounds")
+)
+
 type maskFunc func(*Entry) bool
 
-type maskMap map[int]maskFunc
+type maskMap []maskFunc
 
 func (m maskMap) apply(e *Entry) bool {
-	for i := 0; i < len(m); i++ {
-		f := m[i]
-		if f == nil {
-			continue
-		}
-		if f(e) {
+	for _, v := range m {
+		if v(e) {
 			return true
 		}
 	}
 	return false
 }
 
-func (m maskMap) set(e entry) error {
-	i, err := maskID(e)
+func (m maskMap) set(e entry) (maskMap, error) {
+	f, err := maskFromEntry(e)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m[i], err = maskFromEntry(e)
-	if err != nil {
-		return err
+
+	if e[idxMaskID] == TypeOmit {
+		return append(m, f), nil
 	}
-	return nil
+
+	var i int
+	if i, err = maskID(e); err != nil {
+		return nil, err
+	}
+
+	if i >= len(m) {
+		return nil, errInvalidIndex
+	}
+
+	m[i] = f
+	return m, nil
 }
 
-func (m maskMap) clear() {
-	for k, _ := range m {
-		delete(m, k)
-	}
-}
-
-func (m maskMap) del(e entry) error {
+func (m maskMap) del(e entry) (maskMap, error) {
 	if len(e) < idxMaskID+1 {
-		m.clear()
-		return nil
+		return m[:0], nil
+	}
+
+	if e[idxMaskID] == TypeOmit {
+		if len(m) < 1 {
+			return m, nil
+		}
+		return m[:len(m)-1], nil
 	}
 
 	i, err := maskID(e)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m[i] = nil
 
-	return nil
+	if i >= len(m) {
+		return nil, errIndexOOB
+	}
+
+	return append(m[:i], m[i+1:]...), nil
 }
 
 func maskID(e entry) (int, error) {
-	return strconv.Atoi(e[idxMaskID])
+	i, err := strconv.Atoi(e[idxMaskID])
+	if err != nil {
+		return 0, err
+	}
+	if i < 0 {
+		return 0, errInvalidIndex
+	}
+	return i, nil
 }
 
 func maskFromEntry(e entry) (maskFunc, error) {

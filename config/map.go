@@ -113,7 +113,7 @@ type Map struct {
 func newMap(vars []string) *Map {
 	return &Map{
 		m:  make(map[string]int),
-		mm: make(maskMap),
+		mm: make(maskMap, 0),
 		A:  make([]Entry, 0),
 		v:  newVariableMap(vars),
 	}
@@ -124,15 +124,18 @@ func (m *Map) add(e entry, rootfs *string) error {
 		e[k] = m.v.r.Replace(e[k])
 	}
 
+	var err error
 	switch e.Type() {
 	case
 		maskReplace,
 		maskIgnore,
 		maskIgnoreNeg,
 		maskMode:
-		return m.mm.set(e)
+		m.mm, err = m.mm.set(e)
+		return err
 	case maskClear:
-		return m.mm.del(e)
+		m.mm, err = m.mm.del(e)
+		return err
 	case TypeVariable:
 		return m.v.add(e)
 	}
