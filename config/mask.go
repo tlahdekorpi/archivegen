@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	errInvalidIndex = errors.New("mask: invalid index")
-	errIndexOOB     = errors.New("mask: index out of bounds")
+	errInvalidIndex  = errors.New("mask: invalid index")
+	errNegativeIndex = errors.New("mask: negative index")
+	errIndexOOB      = errors.New("mask: index out of bounds")
 )
 
 type maskFunc func(*Entry) bool
@@ -54,6 +55,10 @@ func (m maskMap) set(e entry) (maskMap, error) {
 	var i int
 	if i, err = maskID(e); err != nil {
 		return nil, err
+	}
+
+	if i == len(m) {
+		return append(m, f), nil
 	}
 
 	if i >= len(m) {
@@ -94,13 +99,13 @@ func maskID(e entry) (int, error) {
 		return 0, err
 	}
 	if i < 0 {
-		return 0, errInvalidIndex
+		return 0, errNegativeIndex
 	}
 	return i, nil
 }
 
 func maskFromEntry(e entry) (maskFunc, error) {
-	if len(e) < 2 {
+	if len(e) < 3 {
 		return nil, errInvalidEntry
 	}
 
