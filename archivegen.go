@@ -63,7 +63,7 @@ func getTree(rootfs string, vars, files []string, stdin bool) *tree.Node {
 
 func printTree(t *tree.Node) {
 	tw := tabwriter.NewWriter(os.Stdout, 1, 1, 2, ' ', 0)
-	t.Print(rootprefix, tw)
+	t.Print(rootprefix, tw, os.Stdout)
 	tw.Flush()
 }
 

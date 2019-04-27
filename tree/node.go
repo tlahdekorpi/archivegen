@@ -15,7 +15,12 @@ type Node struct {
 	E   config.Entry
 }
 
-func (n *Node) Print(p string, w io.Writer) {
+type Writer interface {
+	io.Writer
+	Flush() error
+}
+
+func (n *Node) Print(p string, w Writer, bw io.Writer) {
 	var (
 		d []string
 		m []string
@@ -33,7 +38,15 @@ func (n *Node) Print(p string, w io.Writer) {
 			continue
 		}
 
-		fmt.Fprintln(w, n.Map[v].E.Format())
+		E := n.Map[v].E
+
+		if E.Heredoc == "" {
+			fmt.Fprintln(w, E.Format())
+		} else {
+			fmt.Fprintln(w, E.Format())
+			w.Flush()
+			fmt.Fprintf(bw, "%s%s\n\n", E.Data, E.Heredoc)
+		}
 
 		if i >= l-1-len(d) {
 			fmt.Fprintln(w)
@@ -55,7 +68,7 @@ func (n *Node) Print(p string, w io.Writer) {
 		n.Map[v].E.Dst = dn
 		fmt.Fprintln(w, n.Map[v].E.Format())
 
-		n.Map[v].Print(dn, w)
+		n.Map[v].Print(dn, w, bw)
 	}
 }
 

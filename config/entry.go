@@ -34,7 +34,7 @@ type Entry struct {
 	Mode        int
 	Type        string
 	Data        []byte
-	heredoc     string
+	Heredoc     string
 }
 
 func (e entry) Type() string {
@@ -345,7 +345,7 @@ func (e entry) Entry() (Entry, error) {
 	r.Type = e.Type()
 	r.Data = e.Data()
 
-	r.heredoc = e.heredoc()
+	r.Heredoc = e.heredoc()
 
 	return r, nil
 }
@@ -358,7 +358,7 @@ func (e Entry) Format() string {
 		)
 
 	case TypeCreate, TypeCreateNoEndl:
-		if e.heredoc == "" {
+		if e.Heredoc == "" {
 			return strings.TrimRight(
 				fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t%s",
 					e.Type, e.Dst, e.Mode, e.User, e.Group, e.Data,
@@ -366,8 +366,8 @@ func (e Entry) Format() string {
 			)
 		}
 		return strings.TrimRight(
-			fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t<<%s\n%s%s",
-				e.Type, e.Dst, e.Mode, e.User, e.Group, e.heredoc, e.Data, e.heredoc,
+			fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t<<%s\n",
+				e.Type, e.Dst, e.Mode, e.User, e.Group, e.Heredoc,
 			), "\n",
 		)
 	}
