@@ -1,0 +1,60 @@
+# $ archivegen -X "home=$HOME" -stdout systemd.archive | bsdtar xf - -C /tmp/systemd
+# $ systemd-nspawn -bD /tmp/systemd
+
+$ home  /home/user
+$ shell /usr/bin/bash
+$ build $home/x/github.com/systemd/systemd/build
+
+# all files owned by root
+mm - . - 0 0
+
+# rewrite destination path
+mr - $build usr/lib/systemd
+
+# add compiled binaries from systemd build directory
+L $build/systemd
+L $build/systemctl
+L $build/systemd-shutdown
+
+l ../lib/systemd/systemctl usr/bin/systemctl
+
+# delete rewrite mask
+mc -
+
+# var-run-bad taint
+l ../run var/run
+# nspawn refuses to boot without
+c etc/os-release - - - -
+
+L /usr/bin/ls
+L /usr/bin/less
+L /usr/bin/cat
+L /usr/bin/top
+L $shell
+
+c usr/lib/systemd/system/default.target - - - <<!
+[Unit]
+Description=default target
+Wants=shell.service
+After=shell.service
+!
+
+# variables are expanded inside heredoc
+c usr/lib/systemd/system/shell.service - - - <<!
+[Unit]
+Description=shell ($shell)
+
+[Service]
+Environment=PS1='[\\h \\w]\\$ '
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+ExecStart=$shell
+!
+
+# recursively add directory only including paths containing 'xterm'
+# g /usr/share/terminfo/x/xterm* -
+mI - xterm
+R /usr/share/terminfo/x
+
+# vim: ft=sh
