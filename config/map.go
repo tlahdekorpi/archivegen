@@ -162,20 +162,35 @@ func (m *Map) add(e entry, rootfs *string) error {
 	}
 
 	idx := idxSrc
-	if e.Type() == TypeSymlink {
+	mu := multi(e[idx])
+	symsrc := e.Type() == TypeSymlink
+
+	if symsrc && len(mu) == 1 {
 		idx = idxDst
+		mu = multi(e[idx])
+		symsrc = false
 	}
 
-	mu := multi(e[idx])
-
 	if len(mu) > 1 {
+		var dst string
+		if symsrc {
+			dst = e[idxDst]
+		}
+
 		for _, v := range mu {
+			if symsrc {
+				_, x := path.Split(v)
+				e[idxDst] = path.Join(dst, x)
+			}
+
 			e[idx] = v
+
 			err := m.add(e, rootfs)
 			if err != nil {
 				return err
 			}
 		}
+
 		return nil
 	}
 

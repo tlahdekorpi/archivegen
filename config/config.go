@@ -118,6 +118,9 @@ func multireader(s *bufio.Scanner, entry []string, eof string, t byte) ([]string
 		idx = idxData - 1
 	case 'l':
 		idx = idxDst
+		if len(entry) <= idxDst {
+			idx = idxSrc
+		}
 		ret = entry[idx]
 	default:
 		idx = idxSrc

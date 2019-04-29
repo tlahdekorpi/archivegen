@@ -67,6 +67,8 @@ d multi{
 	# comment
 	3
 } - 1 2
+
+l ../foo/{bar,baz} symlinksrc/
 `)
 
 var testMap = Map{
@@ -92,6 +94,8 @@ var testMap = Map{
 			"multi1",
 			"multi2",
 			"multi3",
+			"symlinksrc/bar",
+			"symlinksrc/baz",
 		} {
 			r[v] = k
 		}
@@ -117,6 +121,8 @@ var testMap = Map{
 		{"multi1", "multi1", 1, 2, 0755, TypeDirectory, nil, ""},
 		{"multi2", "multi2", 1, 2, 0755, TypeDirectory, nil, ""},
 		{"multi3", "multi3", 1, 2, 0755, TypeDirectory, nil, ""},
+		{"../foo/bar", "symlinksrc/bar", 0, 0, 0777, TypeSymlink, nil, ""},
+		{"../foo/baz", "symlinksrc/baz", 0, 0, 0777, TypeSymlink, nil, ""},
 	},
 
 	// TODO: include elf
