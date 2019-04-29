@@ -81,7 +81,8 @@ func TestMaskReplace(t *testing.T) {
 		E *Entry
 		r string
 	}{
-		{entry{"", "", "foo", "bar"}, &Entry{Dst: "/foo/bar/baz"}, "/bar/bar/baz"},
+		{entry{"", "", "foo", "bar"}, &Entry{Dst: "foo/bar/baz"}, "bar/bar/baz"},
+		{entry{"", "", "foo/bar/"}, &Entry{Dst: "foo/bar/baz"}, "baz"},
 	} {
 		f, err := regexReplaceMask(v.e)
 		if err != nil {

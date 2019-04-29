@@ -137,6 +137,11 @@ func regexReplaceMask(e entry) (maskFunc, error) {
 		return nil, err
 	}
 
+	var rs string
+	if len(e) > idxMaskDst {
+		rs = e[idxMaskDst]
+	}
+
 	return func(E *Entry) bool {
 		switch E.Type {
 		case
@@ -145,7 +150,7 @@ func regexReplaceMask(e entry) (maskFunc, error) {
 			TypeRecursive:
 			return false
 		}
-		E.Dst = r.ReplaceAllString(E.Dst, e[idxMaskDst])
+		E.Dst = r.ReplaceAllString(E.Dst, rs)
 		return false
 	}, nil
 }
