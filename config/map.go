@@ -119,6 +119,27 @@ func newMap(vars []string) *Map {
 	}
 }
 
+func multi(s string) []string {
+	i := strings.IndexByte(s, '{')
+	if i < 0 {
+		return []string{s}
+	}
+
+	e := strings.LastIndexByte(s[i:], '}')
+	if e < 0 {
+		return []string{s}
+	}
+
+	a, b := s[:i], s[e+i+1:]
+
+	var r []string
+	for _, v := range strings.Split(s[i+1:i+e], ",") {
+		r = append(r, a+v+b)
+	}
+
+	return r
+}
+
 func (m *Map) add(e entry, rootfs *string) error {
 	for k, _ := range e {
 		e[k] = m.v.r.Replace(e[k])
@@ -138,6 +159,24 @@ func (m *Map) add(e entry, rootfs *string) error {
 		return err
 	case TypeVariable:
 		return m.v.add(e)
+	}
+
+	idx := idxSrc
+	if e.Type() == TypeSymlink {
+		idx = idxDst
+	}
+
+	mu := multi(e[idx])
+
+	if len(mu) > 1 {
+		for _, v := range mu {
+			e[idx] = v
+			err := m.add(e, rootfs)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	E, err := e.Entry()
