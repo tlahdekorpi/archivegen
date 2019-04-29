@@ -12,9 +12,11 @@ mm - . - 0 0
 mr - $build usr/lib/systemd
 
 # add compiled binaries from systemd build directory
-L $build/systemd
-L $build/systemctl
-L $build/systemd-shutdown
+L $build/{
+	systemd
+	systemctl
+	systemd-shutdown
+}
 
 l ../lib/systemd/systemctl usr/bin/systemctl
 
@@ -26,10 +28,7 @@ l ../run var/run
 # nspawn refuses to boot without
 c etc/os-release - - - -
 
-L /usr/bin/ls
-L /usr/bin/less
-L /usr/bin/cat
-L /usr/bin/top
+L /usr/bin/{ls,less,cat,top}
 L $shell
 
 c usr/lib/systemd/system/default.target - - - <<!
