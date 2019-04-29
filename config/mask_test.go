@@ -10,7 +10,8 @@ func TestMaskMap(t *testing.T) {
 		entry{"mm", "0", ".", "1", "-", "-"},
 		entry{"mm", "-", ".", "-", "2", "-"},
 		entry{"mm", "-", ".", "-", "-", "3"},
-		entry{"mm", "1", ".", "-", "2", "-"},
+		entry{"mm", "-", ".", "1", "2", "3"},
+		entry{"mm", "-", ".", "4", "5", "6"},
 	} {
 		mm, err = mm.set(v)
 		if err != nil {
@@ -20,7 +21,7 @@ func TestMaskMap(t *testing.T) {
 
 	{
 		e1 := &Entry{Dst: "foo"}
-		e2 := &Entry{Dst: "foo", Mode: 1, User: 2, Group: 3}
+		e2 := &Entry{Dst: "foo", Mode: 4, User: 5, Group: 6}
 		mm.apply(e1)
 		if a, b := e1.Format(), e2.Format(); a != b {
 			t.Fatalf("add, apply: \n%q\n%q", a, b)
@@ -30,6 +31,7 @@ func TestMaskMap(t *testing.T) {
 	for _, v := range []entry{
 		entry{"mc", "-"},
 		entry{"mc", "1"},
+		entry{"mc", "-2"},
 	} {
 		mm, err = mm.del(v)
 		if err != nil {

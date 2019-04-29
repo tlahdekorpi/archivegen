@@ -74,16 +74,17 @@ func (m maskMap) del(e entry) (maskMap, error) {
 		return m[:0], nil
 	}
 
-	if e[idxMaskID] == TypeOmit {
-		if len(m) < 1 {
-			return m, nil
-		}
-		return m[:len(m)-1], nil
-	}
-
 	i, err := maskID(e)
 	if err != nil {
 		return nil, err
+	}
+
+	if i < 0 {
+		if len(m) < 1 {
+			return m, nil
+		}
+		i = -i
+		return m[:len(m)-i], nil
 	}
 
 	if i >= len(m) {
@@ -94,13 +95,25 @@ func (m maskMap) del(e entry) (maskMap, error) {
 }
 
 func maskID(e entry) (int, error) {
+	c := e.Type() == maskClear
+
+	if c && e[idxMaskID] == TypeOmit {
+		return -1, nil
+	}
+
 	i, err := strconv.Atoi(e[idxMaskID])
 	if err != nil {
 		return 0, err
 	}
+
+	if c {
+		return i, nil
+	}
+
 	if i < 0 {
 		return 0, errNegativeIndex
 	}
+
 	return i, nil
 }
 
