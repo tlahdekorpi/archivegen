@@ -59,24 +59,44 @@ d merge1
 f merge2 test
 d $testvar1
 d $x2
+
+l busybox {foo,bar,baz}
+d multi{
+	1,2
+
+	# comment
+	3
+} - 1 2
 `)
 
 var testMap = Map{
-	m: map[string]int{
-		"name":       0,
-		"archive":    1,
-		"dst":        2,
-		"sh":         3,
-		"omit_test1": 4,
-		"omit_test2": 5,
-		"merge1":     6,
-		"test":       7,
-		"testvar1":   8,
-		"testvar2":   9,
-		"$testvar1":  10,
-		"global1":    11,
-		"global2":    12,
-	},
+	m: func() map[string]int {
+		r := make(map[string]int)
+		for k, v := range []string{
+			"name",
+			"archive",
+			"dst",
+			"sh",
+			"omit_test1",
+			"omit_test2",
+			"merge1",
+			"test",
+			"testvar1",
+			"testvar2",
+			"$testvar1",
+			"global1",
+			"global2",
+			"foo",
+			"bar",
+			"baz",
+			"multi1",
+			"multi2",
+			"multi3",
+		} {
+			r[v] = k
+		}
+		return r
+	}(),
 	A: []Entry{
 		{"name", "name", 0, 0, 0, TypeDirectory, nil, ""},
 		{"disk", "archive", 0, 0, 0644, TypeRegular, nil, ""},
@@ -91,6 +111,12 @@ var testMap = Map{
 		{"$testvar1", "$testvar1", 0, 0, 0755, TypeDirectory, nil, ""},
 		{"global1", "global1", 0, 0, 0755, TypeDirectory, nil, ""},
 		{"global2", "global2", 0, 0, 0755, TypeDirectory, nil, ""},
+		{"busybox", "foo", 0, 0, 0777, TypeSymlink, nil, ""},
+		{"busybox", "bar", 0, 0, 0777, TypeSymlink, nil, ""},
+		{"busybox", "baz", 0, 0, 0777, TypeSymlink, nil, ""},
+		{"multi1", "multi1", 1, 2, 0755, TypeDirectory, nil, ""},
+		{"multi2", "multi2", 1, 2, 0755, TypeDirectory, nil, ""},
+		{"multi3", "multi3", 1, 2, 0755, TypeDirectory, nil, ""},
 	},
 
 	// TODO: include elf

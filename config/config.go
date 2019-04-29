@@ -83,12 +83,13 @@ func fieldsFuncN(s string, n int, f func(rune) bool) []string {
 	return ret
 }
 
-const idx = idxData - 1
+func isheredoc(data []string) string {
+	const idx = idxData - 1
 
-func isHeredoc(data []string) string {
 	if len(data) < idxData {
 		return ""
 	}
+
 	if len(data[idx]) <= 2 {
 		return ""
 	}
@@ -97,7 +98,82 @@ func isHeredoc(data []string) string {
 	if x[:2] != "<<" {
 		return ""
 	}
+
 	return x[2:]
+}
+
+var multiReplace = strings.NewReplacer(
+	"\t", "",
+	"\n", ",",
+).Replace
+
+func multireader(s *bufio.Scanner, entry []string, eof string, t byte) ([]string, int, error) {
+	var (
+		idx int
+		ret string
+	)
+
+	switch t {
+	case 'c':
+		idx = idxData - 1
+	case 'l':
+		idx = idxDst
+		ret = entry[idx]
+	default:
+		idx = idxSrc
+		ret = entry[idx]
+	}
+
+	var (
+		n int
+		r string
+	)
+
+	for s.Scan() {
+		n++
+
+		if err := s.Err(); err != nil {
+			return entry, n, err
+		}
+
+		r = s.Text()
+
+		switch t {
+		case 'c':
+			if r != eof {
+				ret += r + "\n"
+				continue
+			}
+		default:
+			r = strings.TrimSpace(r)
+			if len(r) == 0 {
+				continue
+			}
+			if r[0] == '#' {
+				continue
+			}
+			if r[0] != '}' {
+				ret += r + "\n"
+				continue
+			}
+		}
+
+		break
+	}
+
+	ret = strings.TrimSuffix(ret, "\n")
+
+	if t != 'c' {
+		rr := fieldsFuncN(r, -1, split)
+		ret += rr[0]
+		ret = multiReplace(ret)
+		entry = append(entry, rr[1:]...)
+	} else {
+		entry = append(entry, eof)
+	}
+
+	entry[idx] = ret
+	return entry, n, nil
 }
 
 // TODO: error handling
@@ -105,36 +181,12 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 	s := bufio.NewScanner(r)
 	m := newMap(vars)
 
-	var (
-		heredoc []string
-		hereEOF string
-	)
-
 	var n int
-
 	for s.Scan() {
 		n++
 		if err := s.Err(); err != nil {
 			log.Printf("error: %q, line %d", err, n)
 			return nil
-		}
-
-		if heredoc != nil {
-			r := s.Text()
-			if r != hereEOF {
-				heredoc[idx] += r + "\n"
-				continue
-			}
-
-			heredoc[idx] = strings.TrimSuffix(heredoc[idx], "\n")
-			heredoc = append(heredoc, hereEOF)
-
-			if err := m.add(heredoc, rootfs); err != nil {
-				log.Printf("error: %s, line %d", err, n)
-				return nil
-			}
-			heredoc = nil
-			continue
 		}
 
 		d := s.Text()
@@ -145,17 +197,30 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 			continue
 		}
 
-		var f []string
-		if d[0] != 'c' {
-			f = fieldsFuncN(d, -1, split)
-		} else {
+		var (
+			i   int
+			err error
+			f   []string
+		)
+
+		switch d[0] {
+		case 'c':
 			f = fieldsFuncN(d, idxData, split)
-			if x := isHeredoc(f); x != "" {
-				f[idx] = ""
-				heredoc = f
-				hereEOF = x
-				continue
+			if eof := isheredoc(f); eof != "" {
+				f, i, err = multireader(s, f, eof, d[0])
 			}
+		default:
+			f = fieldsFuncN(d, -1, split)
+			if d[len(d)-1] == '{' {
+				f, i, err = multireader(s, f, "}", d[0])
+			}
+		}
+
+		n = +i
+
+		if err != nil {
+			log.Printf("error: %s, line %d", err, n)
+			return nil
 		}
 
 		if len(f) < 2 && f[idxType] != maskClear {
