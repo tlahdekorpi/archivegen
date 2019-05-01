@@ -163,22 +163,32 @@ func (m *Map) add(e entry, rootfs *string) error {
 
 	idx := idxSrc
 	mu := multi(e[idx])
-	symsrc := e.Type() == TypeSymlink
 
-	if symsrc && len(mu) == 1 {
-		idx = idxDst
-		mu = multi(e[idx])
-		symsrc = false
+	var dst string
+	if len(e) > idxDst && e[idxDst] != TypeOmit {
+		switch e.Type() {
+		case
+			TypeDirectory,
+			TypeGlob,
+			TypeGlobRel,
+			TypeCreate,
+			TypeCreateNoEndl:
+			break
+		case TypeSymlink:
+			if len(mu) == 1 {
+				idx = idxDst
+				mu = multi(e[idx])
+				break
+			}
+			fallthrough
+		default:
+			dst = e[idxDst]
+		}
 	}
 
 	if len(mu) > 1 {
-		var dst string
-		if symsrc {
-			dst = e[idxDst]
-		}
-
 		for _, v := range mu {
-			if symsrc {
+			if dst != "" {
 				_, x := path.Split(v)
 				e[idxDst] = path.Join(dst, x)
 			}

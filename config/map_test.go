@@ -69,6 +69,7 @@ d multi{
 } - 1 2
 
 l ../foo/{bar,baz} symlinksrc/
+f multifile{1,2,3} multidst
 `)
 
 var testMap = Map{
@@ -96,6 +97,9 @@ var testMap = Map{
 			"multi3",
 			"symlinksrc/bar",
 			"symlinksrc/baz",
+			"multidst/multifile1",
+			"multidst/multifile2",
+			"multidst/multifile3",
 		} {
 			r[v] = k
 		}
@@ -123,6 +127,9 @@ var testMap = Map{
 		{"multi3", "multi3", 1, 2, 0755, TypeDirectory, nil, ""},
 		{"../foo/bar", "symlinksrc/bar", 0, 0, 0777, TypeSymlink, nil, ""},
 		{"../foo/baz", "symlinksrc/baz", 0, 0, 0777, TypeSymlink, nil, ""},
+		{"multifile1", "multidst/multifile1", 0, 0, 0644, TypeRegular, nil, ""},
+		{"multifile2", "multidst/multifile2", 0, 0, 0644, TypeRegular, nil, ""},
+		{"multifile3", "multidst/multifile3", 0, 0, 0644, TypeRegular, nil, ""},
 	},
 
 	// TODO: include elf
