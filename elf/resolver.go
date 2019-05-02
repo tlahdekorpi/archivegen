@@ -29,7 +29,12 @@ func split(a []string) []string {
 	return r
 }
 
-type pathset map[string]int
+type pt struct {
+	id     int
+	origin bool
+}
+
+type pathset map[string]pt
 
 func (p pathset) copy() pathset {
 	r := make(pathset, len(p))
@@ -48,6 +53,10 @@ func tokenExpander(origin string) *strings.Replacer {
 		"$PLATFORM", "x86_64",
 		"${PLATFORM}", "x86_64",
 	)
+}
+
+func isorigin(s string) bool {
+	return strings.Contains(s, "$ORIGIN") || strings.Contains(s, "${ORIGIN}")
 }
 
 func (p pathset) add(origin string, s ...string) pathset {
@@ -71,6 +80,8 @@ func (p pathset) add(origin string, s ...string) pathset {
 		if sr == nil {
 			sr = tokenExpander(origin)
 		}
+
+		o := isorigin(v)
 		v = sr.Replace(v)
 
 		if _, exists := r[v]; exists {
@@ -80,18 +91,23 @@ func (p pathset) add(origin string, s ...string) pathset {
 			r = r.copy()
 			c = true
 		}
-		r[v] = len(r)
+		r[v] = pt{len(r), o}
 	}
 
 	return r
 }
 
-func (p pathset) list() []string {
+type pe struct {
+	path   string
+	origin bool
+}
+
+func (p pathset) list() []pe {
 	i := len(p)
-	r := make([]string, i)
+	r := make([]pe, i)
 
 	for k, v := range p {
-		r[v] = k
+		r[v.id] = pe{k, v.origin}
 	}
 
 	return r
@@ -194,16 +210,17 @@ type context struct {
 	ldconf pathset
 	class  elf.Class
 	root   *string
+	abs    bool
 }
 
-func (c *context) search1(file string, ret set, from []string) (string, elfFile, error) {
+func (c *context) search1(file string, ret set, from []pe) (string, elfFile, error) {
 	var r string
 
 	for _, v := range from {
-		dir := v
+		dir := v.path
 		if file[0] != '/' {
 			// relative path
-			dir = rootprefix(v, c.root, false)
+			dir = rootprefix(v.path, c.root, c.abs && v.origin)
 			r = path.Join(dir, file)
 		} else {
 			// absolute path
@@ -216,7 +233,7 @@ func (c *context) search1(file string, ret set, from []string) (string, elfFile,
 		}
 
 		// ignore caching for defaultlibs
-		switch v {
+		switch v.path {
 		case
 			"/lib64",
 			"/usr/lib64",
@@ -256,7 +273,7 @@ func (c *context) search1(file string, ret set, from []string) (string, elfFile,
 	return r, nil, errorNotFound{r}
 }
 
-func (c *context) search(file string, ret set, path ...[]string) (string, elfFile, error) {
+func (c *context) search(file string, ret set, path ...[]pe) (string, elfFile, error) {
 	var (
 		f   elfFile
 		r   string
@@ -288,7 +305,15 @@ func (c *context) search(file string, ret set, path ...[]string) (string, elfFil
 	return r, f, err
 }
 
-func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []string, ret set) error {
+func mkpe(p []string) []pe {
+	r := make([]pe, len(p))
+	for i := 0; i < len(p); i++ {
+		r[i] = pe{p[i], false}
+	}
+	return r
+}
+
+func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, ret set) error {
 	if ret.add(file) {
 		return nil
 	}
@@ -299,10 +324,12 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []string
 	}
 
 	oldrunpath := runpath
-	runpath, err = f.DynString(elf.DT_RUNPATH)
+	var newrunpath []string
+	newrunpath, err = f.DynString(elf.DT_RUNPATH)
 	if err != nil {
 		return err
 	}
+	runpath = mkpe(split(newrunpath))
 
 	rpathE, err := f.DynString(elf.DT_RPATH)
 	if err != nil {
@@ -327,12 +354,10 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []string
 
 	if len(runpath) > 0 {
 		x := tokenExpander(rd)
-		for k, _ := range runpath {
-			runpath[k] = x.Replace(runpath[k])
+		for k, v := range runpath {
+			runpath[k] = pe{x.Replace(v.path), isorigin(v.path)}
 		}
 	}
-
-	runpath = split(runpath)
 
 	for _, v := range needed {
 		// glibc libc.so is not an elf and
@@ -398,7 +423,7 @@ func ldList(dir string) ([]string, error) {
 	return r, nil
 }
 
-var defaultLibs = []string{
+var defaultLibs = mkpe([]string{
 	"/lib64",
 	"/usr/lib64",
 	"/lib",
@@ -406,13 +431,14 @@ var defaultLibs = []string{
 	// freebsd
 	// "/usr/lib/compat",
 	// "/usr/local/lib",
-}
+})
 
 var defaultcache = newfileset()
 
 func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 	var ctx context
 	ctx.err = make(set)
+	ctx.abs = abs
 	if cache {
 		ctx.cache = defaultcache
 	}
