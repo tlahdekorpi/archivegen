@@ -147,6 +147,7 @@ func main() {
 	if *flagStdout {
 		flagOut = nil
 	}
+
 	if *flagVersion {
 		fmt.Printf("build: %s\nruntime: %s\n", buildversion, runtime.Version())
 		return
@@ -158,6 +159,9 @@ func main() {
 	}
 
 	root := getTree(*flagRootfs, []string(varX), flag.Args(), p && flag.NArg() < 1)
+	if len(root.Map) < 1 {
+		log.Fatal("empty archive")
+	}
 
 	if *flagPrint {
 		printTree(root)
