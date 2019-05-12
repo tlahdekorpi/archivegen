@@ -1,0 +1,59 @@
+mm - . - 0 0
+
+d {sys,dev,proc,tmp,run,new_root}
+l usr/{sbin,bin,lib} /
+l bin usr/sbin
+
+L /usr/lib/systemd/systemd-udevd
+L /usr/lib/udev/{ata,scsi}_id
+
+L /usr/sbin/{
+	busybox
+	blkid
+	dmsetup
+	fdisk
+	hdparm
+	mdadm
+	switch_root
+} usr/bin
+
+L /usr/bin/{
+	bash
+	mount
+	umount
+	udevadm
+	systemd-tmpfiles
+}
+
+l busybox usr/bin/{sh,ash,chroot,mkdir,sleep,stat,env,ls}
+
+L /usr/bin/kmod
+l kmod usr/bin/{dep,ins,ls,rm}mod
+l kmod usr/bin/mod{info,probe}
+
+fr /usr/lib/udev/rules.d/{
+	10-dm
+	13-dm-disk
+	50-udev-default
+	60-persistent-storage
+	63-md-raid-arrays
+	64-md-raid-assembly
+	80-drivers
+	95-dm-notify
+}.rules
+
+# https://git.archlinux.org/mkinitcpio.git/
+R /usr/lib/initcpio/udev usr/lib/udev/rules.d
+f /usr/lib/initcpio/init{,_functions} / 0755
+f /usr/lib/initcpio/hooks/udev hooks/udev 0755
+
+c config - - - <<!
+MODULES=
+EARLYHOOKS=udev
+HOOKS=udev
+LATEHOOKS=
+CLEANUPHOOKS=udev
+!
+
+$ kernel 5.1
+R /usr/lib/modules/$kernel

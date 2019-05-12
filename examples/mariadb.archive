@@ -1,29 +1,29 @@
-$ mysqluid 100000
+$ uid 1000
+$ gid $uid
 
-d mysql - $mysqluid $mysqluid
+d mysql - $uid $gid
 
-mm 0 . - 0 0
+mm - . - 0 0
 
-g /etc/ld.so.conf.d/*.conf -
+fr /usr/share/mariadb/english/errmsg.sys
+fr /usr/share/mariadb/{
+	mysql_system_tables
+	mysql_performance_tables
+	mysql_system_tables_data
+	maria_add_gis_sp_bootstrap
+	fill_help_tables
+}.sql
 
-fr /usr/share/mysql/mysql_system_tables.sql
-fr /usr/share/mysql/mysql_performance_tables.sql
-fr /usr/share/mysql/mysql_system_tables_data.sql
-fr /usr/share/mysql/fill_help_tables.sql
-fr /usr/share/mysql/maria_add_gis_sp_bootstrap.sql
-fr /usr/share/mysql/english/errmsg.sys
+L /usr/{
+	bin/mysql,libexec/mysqld
+	sbin/busybox
+} usr/bin
 
-L /usr/bin/pgrep
-L /usr/bin/mysql
-L /usr/sbin/mysqld usr/bin/mysqld
-
-L /bin/busybox usr/bin/busybox
-l busybox usr/bin/sh
-
+l busybox usr/bin/{sh,su,rm,sleep,chown,exec,seq,cat,pgrep}
 l usr/bin bin
 
-c etc/passwd - - - user:x:$mysqluid:$mysqluid::/:/bin/sh
-c etc/group  - - - user:x:$mysqluid:
+c etc/passwd - - - user:x:$uid:$gid::/:/bin/sh
+c etc/group  - - - user:x:$gid:
 
 c etc/my.cnf - - - <<EOF
 [client]
@@ -65,7 +65,7 @@ EOF
 
 c usr/bin/entrypoint 0755 - - <<EOF
 #!/usr/bin/sh
-chown -R $mysqluid:$mysqluid /mysql
+chown -R $uid:$gid /mysql
 exec su user -c /usr/bin/run $@
 EOF
 
@@ -105,7 +105,7 @@ if [ -e "/mysql/bootstrap.sql" ]; then
 	run_mysql $@
 fi
 
-cd /usr/share/mysql
+cd /usr/share/mariadb
 echo -e "CREATE DATABASE mysql;\nUSE mysql;" > /mysql/bootstrap.sql;
 
 cat >> /mysql/bootstrap.sql \
