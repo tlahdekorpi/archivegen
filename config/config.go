@@ -219,7 +219,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 			}
 		}
 
-		n = +i
+		n += i
 
 		if err != nil {
 			log.Printf("error: %s, line %d", err, n)
