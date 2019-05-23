@@ -28,6 +28,7 @@ f disk archive
 # recursive lookup from disk.
 # R src dst
 c   dst   -	 -   -	 test		  test  
+c   nodata
 
 # does lookup from disk.
 # L elf dst
@@ -79,6 +80,7 @@ var testMap = Map{
 			"name",
 			"archive",
 			"dst",
+			"nodata",
 			"sh",
 			"omit_test1",
 			"omit_test2",
@@ -109,6 +111,7 @@ var testMap = Map{
 		{"name", "name", 0, 0, 0, TypeDirectory, nil, ""},
 		{"disk", "archive", 0, 0, 0644, TypeRegular, nil, ""},
 		{"dst", "dst", 0, 0, 0644, TypeCreate, []byte("test		  test  \n"), ""},
+		{"nodata", "nodata", 0, 0, 0644, TypeCreate, []byte{}, ""},
 		{"busybox", "sh", 0, 0, 0777, TypeSymlink, nil, ""},
 		{"omit_test1", "omit_test1", 0, 0, 0644, TypeRegular, nil, ""},
 		{"omit_test2", "omit_test2", 0, 0, 0644, TypeRegular, nil, ""},

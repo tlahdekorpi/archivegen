@@ -212,6 +212,9 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 			if eof := isheredoc(f); eof != "" {
 				f, i, err = multireader(s, f, eof, d[0])
 			}
+			if x := len(f); x < idxData {
+				f[x-1] = strings.TrimSpace(f[x-1])
+			}
 		default:
 			f = fieldsFuncN(d, -1, split)
 			if d[len(d)-1] == '{' {

@@ -255,9 +255,14 @@ func (e entry) Data() []byte {
 		return nil
 	}
 
+	i := e.typeOffset(idxData)
+	if len(e) <= i {
+		return []byte{}
+	}
+
 	return []byte(
 		strings.TrimLeft(
-			e[idxData-1],
+			e[i],
 			" \t",
 		) + end,
 	)

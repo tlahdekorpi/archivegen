@@ -39,7 +39,7 @@ const helpFormat = `Format:
     // from data and file is \n terminated
     // 'c file - - -	 foo  bar  ' = 'foo  bar  '
 
-    c *dst mode uid gid *data
+    c *dst mode uid gid data
     // cl is not \n terminated
 
   ELF

@@ -75,7 +75,7 @@ g /a/*/c -
 
 **`c, cl`** Create
 ```sh
-# c *dst mode uid gid *data
+# c *dst mode uid gid data
 c file - - - contents
 # trailing newline is omitted from argument
 cl file - - - contents
