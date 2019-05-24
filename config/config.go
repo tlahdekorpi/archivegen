@@ -17,8 +17,12 @@ var (
 	errNoArguments  = errors.New("config: no arguments")
 )
 
-func split(r rune) bool {
-	return r == ' ' || r == '\t'
+type split rune
+
+func (s *split) split(r rune) bool {
+	ret := rune(*s) != '\\' && r == ' ' || r == '\t'
+	*s = split(r)
+	return ret
 }
 
 func fieldsFuncN(s string, n int, f func(rune) bool) []string {
@@ -167,7 +171,7 @@ func multireader(s *bufio.Scanner, entry []string, eof string, t byte) ([]string
 	ret = strings.TrimSuffix(ret, "\n")
 
 	if t != 'c' {
-		rr := fieldsFuncN(r, -1, split)
+		rr := fieldsFuncN(r, -1, new(split).split)
 		ret += rr[0]
 		ret = multiReplace(ret)
 		entry = append(entry, rr[1:]...)
@@ -208,7 +212,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 
 		switch d[0] {
 		case 'c':
-			f = fieldsFuncN(d, idxData, split)
+			f = fieldsFuncN(d, idxData, new(split).split)
 			if eof := isheredoc(f); eof != "" {
 				f, i, err = multireader(s, f, eof, d[0])
 			}
@@ -216,7 +220,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 				f[x-1] = strings.TrimSpace(f[x-1])
 			}
 		default:
-			f = fieldsFuncN(d, -1, split)
+			f = fieldsFuncN(d, -1, new(split).split)
 			if d[len(d)-1] == '{' {
 				f, i, err = multireader(s, f, "}", d[0])
 			}

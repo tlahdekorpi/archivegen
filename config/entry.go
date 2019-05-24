@@ -306,6 +306,14 @@ func (e entry) Root() *string {
 	return nil
 }
 
+func unescape(s string) string {
+	return strings.ReplaceAll(s, `\ `, ` `)
+}
+
+func escape(s string) string {
+	return strings.ReplaceAll(s, ` `, `\ `)
+}
+
 func (e entry) Entry() (Entry, error) {
 	var (
 		r   Entry
@@ -322,6 +330,9 @@ func (e entry) Entry() (Entry, error) {
 	if err != nil {
 		return r, err
 	}
+
+	r.Dst = unescape(r.Dst)
+	r.Src = unescape(r.Src)
 
 	switch e.Type() {
 	case
@@ -359,25 +370,25 @@ func (e Entry) Format() string {
 	switch e.Type {
 	case TypeDirectory:
 		return fmt.Sprintf("%s\t\t%s\t%04o\t%d\t%d",
-			e.Type, e.Dst, e.Mode, e.User, e.Group,
+			e.Type, escape(e.Dst), e.Mode, e.User, e.Group,
 		)
 
 	case TypeCreate, TypeCreateNoEndl:
 		if e.Heredoc == "" {
 			return strings.TrimRight(
 				fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t%s",
-					e.Type, e.Dst, e.Mode, e.User, e.Group, e.Data,
+					e.Type, escape(e.Dst), e.Mode, e.User, e.Group, e.Data,
 				), "\n",
 			)
 		}
 		return strings.TrimRight(
 			fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t<<%s\n",
-				e.Type, e.Dst, e.Mode, e.User, e.Group, e.Heredoc,
+				e.Type, escape(e.Dst), e.Mode, e.User, e.Group, e.Heredoc,
 			), "\n",
 		)
 	}
 
 	return fmt.Sprintf("%s\t%s\t%s\t%04o\t%d\t%d",
-		e.Type, e.Src, e.Dst, e.Mode, e.User, e.Group,
+		e.Type, escape(e.Src), escape(e.Dst), e.Mode, e.User, e.Group,
 	)
 }
