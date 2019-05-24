@@ -33,8 +33,8 @@ type Entry struct {
 	User, Group int
 	Mode        int
 	Type        string
-	Data        []byte
 	Heredoc     string
+	Data        []byte
 }
 
 func (e entry) Type() string {

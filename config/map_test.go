@@ -50,6 +50,11 @@ d $var1
 $ $var1 testvar2
 d $testvar1
 d $x1
+
+c heredoc - - - <<!heredoc
+test\  data
+
+!heredoc
 `)
 
 var testData2 = []byte(`
@@ -102,37 +107,39 @@ var testMap = Map{
 			"multidst/multifile1",
 			"multidst/multifile2",
 			"multidst/multifile3",
+			"heredoc",
 		} {
 			r[v] = k
 		}
 		return r
 	}(),
 	A: []Entry{
-		{"name", "name", 0, 0, 0, TypeDirectory, nil, ""},
-		{"disk", "archive", 0, 0, 0644, TypeRegular, nil, ""},
-		{"dst", "dst", 0, 0, 0644, TypeCreate, []byte("test		  test  \n"), ""},
-		{"nodata", "nodata", 0, 0, 0644, TypeCreate, []byte{}, ""},
-		{"busybox", "sh", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"omit_test1", "omit_test1", 0, 0, 0644, TypeRegular, nil, ""},
-		{"omit_test2", "omit_test2", 0, 0, 0644, TypeRegular, nil, ""},
-		{"merge1", "merge1", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"merge2", "test", 0, 0, 0644, TypeRegular, nil, ""},
-		{"testvar1", "testvar1", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"testvar2", "testvar2", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"$testvar1", "$testvar1", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"global1", "global1", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"global2", "global2", 0, 0, 0755, TypeDirectory, nil, ""},
-		{"busybox", "foo", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"busybox", "bar", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"busybox", "baz", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"multi1", "multi1", 1, 2, 0755, TypeDirectory, nil, ""},
-		{"multi2", "multi2", 1, 2, 0755, TypeDirectory, nil, ""},
-		{"multi3", "multi3", 1, 2, 0755, TypeDirectory, nil, ""},
-		{"../foo/bar", "symlinksrc/bar", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"../foo/baz", "symlinksrc/baz", 0, 0, 0777, TypeSymlink, nil, ""},
-		{"multifile1", "multidst/multifile1", 0, 0, 0644, TypeRegular, nil, ""},
-		{"multifile2", "multidst/multifile2", 0, 0, 0644, TypeRegular, nil, ""},
-		{"multifile3", "multidst/multifile3", 0, 0, 0644, TypeRegular, nil, ""},
+		{"name", "name", 0, 0, 0, TypeDirectory, "", nil},
+		{"disk", "archive", 0, 0, 0644, TypeRegular, "", nil},
+		{"dst", "dst", 0, 0, 0644, TypeCreate, "", []byte("test		  test  \n")},
+		{"nodata", "nodata", 0, 0, 0644, TypeCreate, "", []byte{}},
+		{"busybox", "sh", 0, 0, 0777, TypeSymlink, "", nil},
+		{"omit_test1", "omit_test1", 0, 0, 0644, TypeRegular, "", nil},
+		{"omit_test2", "omit_test2", 0, 0, 0644, TypeRegular, "", nil},
+		{"merge1", "merge1", 0, 0, 0755, TypeDirectory, "", nil},
+		{"merge2", "test", 0, 0, 0644, TypeRegular, "", nil},
+		{"testvar1", "testvar1", 0, 0, 0755, TypeDirectory, "", nil},
+		{"testvar2", "testvar2", 0, 0, 0755, TypeDirectory, "", nil},
+		{"$testvar1", "$testvar1", 0, 0, 0755, TypeDirectory, "", nil},
+		{"global1", "global1", 0, 0, 0755, TypeDirectory, "", nil},
+		{"global2", "global2", 0, 0, 0755, TypeDirectory, "", nil},
+		{"busybox", "foo", 0, 0, 0777, TypeSymlink, "", nil},
+		{"busybox", "bar", 0, 0, 0777, TypeSymlink, "", nil},
+		{"busybox", "baz", 0, 0, 0777, TypeSymlink, "", nil},
+		{"multi1", "multi1", 1, 2, 0755, TypeDirectory, "", nil},
+		{"multi2", "multi2", 1, 2, 0755, TypeDirectory, "", nil},
+		{"multi3", "multi3", 1, 2, 0755, TypeDirectory, "", nil},
+		{"../foo/bar", "symlinksrc/bar", 0, 0, 0777, TypeSymlink, "", nil},
+		{"../foo/baz", "symlinksrc/baz", 0, 0, 0777, TypeSymlink, "", nil},
+		{"multifile1", "multidst/multifile1", 0, 0, 0644, TypeRegular, "", nil},
+		{"multifile2", "multidst/multifile2", 0, 0, 0644, TypeRegular, "", nil},
+		{"multifile3", "multidst/multifile3", 0, 0, 0644, TypeRegular, "", nil},
+		{"heredoc", "heredoc", 0, 0, 0644, TypeCreate, "!heredoc", []byte("test\\  data\n\n")},
 	},
 
 	// TODO: include elf
@@ -151,6 +158,7 @@ type e struct {
 	uid, gid int
 	mode     int
 	t        string
+	heredoc  string
 	// ignored data []byte
 }
 
