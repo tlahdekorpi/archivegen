@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,6 +11,13 @@ import (
 
 	"github.com/tlahdekorpi/archivegen/elf"
 )
+
+var Opt struct {
+	Warn struct {
+		EmptyGlob bool
+		Replace   bool
+	}
+}
 
 const (
 	TypeOmit         = "-"
@@ -260,6 +268,7 @@ func (m *Map) add(e entry, rootfs *string) error {
 	}
 
 	if i, exists := m.m[E.Dst]; exists {
+		rlog(m.A[i], E)
 		m.A[i] = E
 		return nil
 	}
@@ -275,12 +284,23 @@ func (m *Map) Add(e Entry) {
 	}
 
 	if i, exists := m.m[e.Dst]; exists {
+		rlog(m.A[i], e)
 		m.A[i] = e
 		return
 	}
 
 	m.A = append(m.A, e)
 	m.m[e.Dst] = len(m.A) - 1
+}
+
+func rlog(e1, e2 Entry) {
+	if !Opt.Warn.Replace {
+		return
+	}
+	if e1.Src == e2.Src {
+		return
+	}
+	log.Printf("replace: %s -> %s", e1.Src, e2.Src)
 }
 
 func rootPrefix(file string, rootfs *string) string {
@@ -483,6 +503,10 @@ func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
 	if err != nil {
 		return err
 	}
+	if Opt.Warn.EmptyGlob && len(r) < 1 {
+		log.Printf("emptyglob: %s", e.Src)
+		return nil
+	}
 
 	x := mapW{m: m, e: e, rootfs: rootfs}
 	if user {
@@ -503,9 +527,14 @@ func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
 }
 
 func (m *Map) addElfGlob(e Entry, rootfs *string) error {
-	r, err := filepath.Glob(rootPrefix(e.Src, rootfs))
+	src := rootPrefix(e.Src, rootfs)
+	r, err := filepath.Glob(src)
 	if err != nil {
 		return err
+	}
+	if Opt.Warn.EmptyGlob && len(r) < 1 {
+		log.Printf("emptyglob: %s", src)
+		return nil
 	}
 	for _, v := range r {
 		e.Src = trimPrefix(v, rootfs)

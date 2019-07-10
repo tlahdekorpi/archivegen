@@ -123,6 +123,9 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("archivegen: ")
 
+	flag.BoolVar(&config.Opt.Warn.EmptyGlob, "warn.emptyglob", false, "Glob types don't return any matches")
+	flag.BoolVar(&config.Opt.Warn.Replace, "warn.replace", false, "Entry is replaced")
+
 	var varX varValue
 	flag.Var(&varX, "X", "variable\n"+
 		"e.g. '-X foo=bar -X a=b'",
