@@ -430,7 +430,6 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 	}
 
 	if info.IsDir() {
-		// TODO: mode masks
 		m.m.Add(Entry{
 			rf,
 			rf,

@@ -46,7 +46,7 @@ func getTree(rootfs string, vars, files []string, stdin bool) *tree.Node {
 	)
 
 	if stdin {
-		r = config.FromReaderRoot(rootfs, vars, os.Stdin)
+		r, err = config.FromReaderRoot(rootfs, vars, os.Stdin)
 	} else {
 		r, err = config.FromFilesRoot(rootfs, vars, files...)
 	}
@@ -119,7 +119,8 @@ var (
 const defaultBufSize = 1 << 24
 
 func main() {
-	log.SetFlags(log.Lshortfile)
+	log.SetFlags(0)
+	log.SetPrefix("archivegen: ")
 
 	var varX varValue
 	flag.Var(&varX, "X", "variable\n"+

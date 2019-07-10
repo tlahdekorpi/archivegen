@@ -2,8 +2,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
-	"log"
 	"testing"
 	"unsafe"
 )
@@ -41,9 +39,6 @@ l busybox sh
 # intentional omit
 f omit_test1 -
 f omit_test2
-
-# no arguments
-L	  
 
 $ var1 testvar1
 d $var1
@@ -174,13 +169,17 @@ func equal(src, dst *Entry) bool {
 }
 
 func TestMapResolve(t *testing.T) {
-	log.SetFlags(log.Lshortfile)
-	log.SetOutput(ioutil.Discard)
-
 	vars := []string{"x", "global"}
 
-	m1 := FromReader(vars, dataBuf1())
-	m2 := FromReader(vars, dataBuf2())
+	var m1, m2 *Map
+	var err error
+	if m1, err = FromReader(vars, dataBuf1()); err != nil {
+		t.Fatal(err)
+	}
+	if m2, err = FromReader(vars, dataBuf2()); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := m1.Merge(m2); err != nil {
 		t.Fatal(err)
 	}

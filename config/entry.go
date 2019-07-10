@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"strconv"
 	"strings"
@@ -74,7 +73,6 @@ func (e entry) Src() (string, error) {
 		return e[1], nil
 	}
 
-	log.Printf("error: %v", e)
 	return "", errInvalidEntry
 }
 
@@ -151,7 +149,6 @@ func (e entry) Dst() (string, error) {
 
 	}
 
-	log.Printf("error: %#v", e)
 	return "", errInvalidEntry
 }
 
@@ -320,7 +317,6 @@ func (e entry) Entry() (Entry, error) {
 		err error
 	)
 
-	// TODO: error handling
 	r.Dst, err = e.Dst()
 	if err != nil {
 		return r, err

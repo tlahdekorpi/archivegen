@@ -5,16 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"strings"
 )
 
 var (
-	errInvalidEntry = errors.New("config: invalid entry")
-	errIgnoredEntry = errors.New("config: ignored entry")
-	errNoArguments  = errors.New("config: no arguments")
+	errInvalidEntry = errors.New("invalid entry")
+	errIgnoredEntry = errors.New("ignored entry")
+	errNoArguments  = errors.New("no arguments")
 )
 
 type split rune
@@ -183,8 +182,16 @@ func multireader(s *bufio.Scanner, entry []string, eof string, t byte) ([]string
 	return entry, n, nil
 }
 
-// TODO: error handling
-func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
+type lineError struct {
+	line int
+	err  error
+}
+
+func (l lineError) Error() string {
+	return fmt.Sprintf("%s, line %d", l.err.Error(), l.line)
+}
+
+func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 	s := bufio.NewScanner(r)
 	m := newMap(vars)
 
@@ -192,8 +199,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 	for s.Scan() {
 		n++
 		if err := s.Err(); err != nil {
-			log.Printf("error: %q, line %d", err, n)
-			return nil
+			return nil, lineError{n, err}
 		}
 
 		d := s.Text()
@@ -229,29 +235,29 @@ func fromReader(rootfs *string, vars []string, r io.Reader) *Map {
 		n += i
 
 		if err != nil {
-			log.Printf("error: %s, line %d", err, n)
-			return nil
+			return nil, lineError{n, err}
 		}
 
 		if len(f) < 2 && f[idxType] != maskClear {
-			log.Printf("error: %s, line %d", errNoArguments, n)
-			continue
+			return nil, lineError{n, errNoArguments}
 		}
 
 		if err := m.add(f, rootfs); err != nil {
-			log.Printf("error: %s, line %d", err, n)
-			return nil
+			return nil, lineError{n, err}
 		}
 	}
 
-	return m
+	if err := s.Err(); err != nil {
+		return nil, lineError{n, err}
+	}
+	return m, nil
 }
 
-func FromReader(vars []string, r io.Reader) *Map {
+func FromReader(vars []string, r io.Reader) (*Map, error) {
 	return fromReader(nil, vars, r)
 }
 
-func FromReaderRoot(rootfs string, vars []string, r io.Reader) *Map {
+func FromReaderRoot(rootfs string, vars []string, r io.Reader) (*Map, error) {
 	if rootfs != "" {
 		return fromReader(&rootfs, vars, r)
 	}
@@ -266,11 +272,9 @@ func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 			return nil, err
 		}
 
-		// TODO: err
-		m := FromReaderRoot(*rootfs, vars, f)
-
-		if m == nil {
-			return nil, fmt.Errorf("error")
+		m, err := FromReaderRoot(*rootfs, vars, f)
+		if err != nil {
+			return nil, err
 		}
 
 		if err := cfg.Merge(m); err != nil {
