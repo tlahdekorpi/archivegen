@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -99,6 +100,14 @@ func Write(e config.Entry, w archive.Writer) error {
 	case config.TypeSymlink:
 		return w.Symlink(e.Src, e.Dst, e.User, e.Group)
 
+	case config.TypeBase64:
+		d := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
+		n, err := base64.StdEncoding.Decode(d, e.Data)
+		if err != nil {
+			return err
+		}
+		e.Data = d[:n]
+		fallthrough
 	case config.TypeCreate, config.TypeCreateNoEndl:
 		return createFile(w, e.Dst, e.Mode, e.User, e.Group, e.Data)
 	}

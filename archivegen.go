@@ -61,9 +61,9 @@ func getTree(rootfs string, vars, files []string, stdin bool) *tree.Node {
 
 }
 
-func printTree(t *tree.Node) {
+func printTree(t *tree.Node, b64 bool) {
 	tw := tabwriter.NewWriter(os.Stdout, 1, 1, 2, ' ', 0)
-	t.Print(rootprefix, tw, os.Stdout)
+	t.Print(rootprefix, tw, os.Stdout, b64)
 	tw.Flush()
 }
 
@@ -113,6 +113,7 @@ var (
 	flagStdout        = flag.Bool("stdout", false, "output to stdout")
 	flagVersion       = flag.Bool("version", false, "version")
 	flagArchiveFormat = flag.Bool("format", false, "print archive format")
+	flagBase64        = flag.Bool("b64", false, "base64 encode all create types")
 	flagChdir         = flag.String("C", "", "chdir")
 )
 
@@ -165,7 +166,7 @@ func main() {
 	}
 
 	if *flagPrint {
-		printTree(root)
+		printTree(root, *flagBase64)
 		os.Exit(0)
 	}
 

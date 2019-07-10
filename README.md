@@ -73,12 +73,14 @@ g /a/*/c -
 # /a/b/c -> a/b/c
 ```
 
-**`c, cl`** Create
+**`c, cl, b64`** Create
 ```sh
 # c *dst mode uid gid data
 c file - - - contents
 # trailing newline is omitted from argument
 cl file - - - contents
+# binary data can added as base64
+b64 file - - - Y29udGVudHMK
 # argument can be a heredoc, variables are expanded inside heredoc
 $ variable data
 c file - - - <<!

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
 	"strconv"
@@ -64,6 +65,7 @@ func (e entry) Src() (string, error) {
 		TypeGlobRel,
 		TypeCreate,
 		TypeCreateNoEndl,
+		TypeBase64,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
 		TypeLinked:
@@ -141,7 +143,8 @@ func (e entry) Dst() (string, error) {
 
 	case
 		TypeCreate,
-		TypeCreateNoEndl:
+		TypeCreateNoEndl,
+		TypeBase64:
 		if len(e) < 2 {
 			break
 		}
@@ -183,7 +186,8 @@ func (e entry) typeOffset(i int) int {
 		TypeGlobRel,
 		TypeDirectory,
 		TypeCreate,
-		TypeCreateNoEndl:
+		TypeCreateNoEndl,
+		TypeBase64:
 		i--
 	}
 	return i
@@ -246,7 +250,7 @@ func (e entry) Data() []byte {
 	case TypeCreate:
 		end = "\n"
 		break
-	case TypeCreateNoEndl:
+	case TypeCreateNoEndl, TypeBase64:
 		break
 	default:
 		return nil
@@ -267,7 +271,7 @@ func (e entry) Data() []byte {
 
 func (e entry) heredoc() string {
 	switch e.Type() {
-	case TypeCreate, TypeCreateNoEndl:
+	case TypeCreate, TypeCreateNoEndl, TypeBase64:
 		break
 	default:
 		return ""
@@ -362,6 +366,22 @@ func (e entry) Entry() (Entry, error) {
 	return r, nil
 }
 
+func (e Entry) Base64() Entry {
+	switch e.Type {
+	case TypeCreate, TypeCreateNoEndl:
+		break
+	default:
+		return e
+	}
+
+	d := make([]byte, base64.StdEncoding.EncodedLen(len(e.Data)))
+	base64.StdEncoding.Encode(d, e.Data)
+	e.Data = d
+	e.Type = TypeBase64
+	e.Heredoc = ""
+	return e
+}
+
 func (e Entry) Format() string {
 	switch e.Type {
 	case TypeDirectory:
@@ -369,7 +389,7 @@ func (e Entry) Format() string {
 			e.Type, escape(e.Dst), e.Mode, e.User, e.Group,
 		)
 
-	case TypeCreate, TypeCreateNoEndl:
+	case TypeCreate, TypeCreateNoEndl, TypeBase64:
 		if e.Heredoc == "" {
 			return strings.TrimRight(
 				fmt.Sprintf("%s\t%s\t\t%04o\t%d\t%d\t%s",

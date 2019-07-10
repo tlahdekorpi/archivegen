@@ -26,6 +26,7 @@ const (
 	TypeLinked       = "L"
 	TypeLinkedGlob   = "gL"
 	TypeLinkedAbs    = "LA"
+	TypeBase64       = "b64"
 	TypeVariable     = "$"
 )
 
@@ -172,7 +173,8 @@ func (m *Map) add(e entry, rootfs *string) error {
 			TypeGlob,
 			TypeGlobRel,
 			TypeCreate,
-			TypeCreateNoEndl:
+			TypeCreateNoEndl,
+			TypeBase64:
 			break
 		case TypeSymlink:
 			if len(mu) == 1 {

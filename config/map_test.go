@@ -52,6 +52,8 @@ test\  data
 !heredoc
 
 f foo\ bar b\ az
+
+b64 base64 - - - YmFzZTY0
 `)
 
 var testData2 = []byte(`
@@ -106,6 +108,7 @@ var testMap = Map{
 			"multidst/multifile3",
 			"heredoc",
 			"b az",
+			"base64",
 		} {
 			r[v] = k
 		}
@@ -139,6 +142,7 @@ var testMap = Map{
 		{"multifile3", "multidst/multifile3", 0, 0, 0644, TypeRegular, "", nil},
 		{"heredoc", "heredoc", 0, 0, 0644, TypeCreate, "!heredoc", []byte("test\\  data\n\n")},
 		{"foo bar", "b az", 0, 0, 0644, TypeRegular, "", nil},
+		{"base64", "base64", 0, 0, 0644, TypeBase64, "", []byte("YmFzZTY0")},
 	},
 
 	// TODO: include elf

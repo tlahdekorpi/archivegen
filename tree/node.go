@@ -20,7 +20,7 @@ type Writer interface {
 	Flush() error
 }
 
-func (n *Node) Print(p string, w Writer, bw io.Writer) {
+func (n *Node) Print(p string, w Writer, bw io.Writer, b64 bool) {
 	var (
 		d []string
 		m []string
@@ -39,6 +39,10 @@ func (n *Node) Print(p string, w Writer, bw io.Writer) {
 		}
 
 		E := n.Map[v].E
+
+		if b64 {
+			E = E.Base64()
+		}
 
 		if E.Heredoc == "" {
 			fmt.Fprintln(w, E.Format())
@@ -68,7 +72,7 @@ func (n *Node) Print(p string, w Writer, bw io.Writer) {
 		n.Map[v].E.Dst = dn
 		fmt.Fprintln(w, n.Map[v].E.Format())
 
-		n.Map[v].Print(dn, w, bw)
+		n.Map[v].Print(dn, w, bw, b64)
 	}
 }
 
