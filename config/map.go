@@ -14,8 +14,8 @@ import (
 
 var Opt struct {
 	Warn struct {
-		EmptyGlob bool
-		Replace   bool
+		EmptyGlob bool `desc:"Glob types don't return any matches"`
+		Replace   bool `desc:"Entry is replaced"`
 	}
 }
 
