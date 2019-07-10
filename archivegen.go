@@ -133,7 +133,7 @@ func main() {
 	}
 
 	if opt.ArchiveFormat {
-		fmt.Fprintln(os.Stderr, helpFormat)
+		fmt.Fprintln(os.Stderr, helpFormat[1:])
 		return
 	}
 
