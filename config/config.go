@@ -266,7 +266,7 @@ func FromReaderRoot(rootfs string, vars []string, r io.Reader) (*Map, error) {
 
 func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 	cfg := newMap(vars)
-	for _, v := range files {
+	for k, v := range files {
 		f, err := os.Open(path.Clean(v))
 		if err != nil {
 			return nil, err
@@ -274,15 +274,15 @@ func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 
 		m, err := FromReaderRoot(*rootfs, vars, f)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s (%d): %v", v, k, err)
 		}
 
 		if err := cfg.Merge(m); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s (%d): %v", v, k, err)
 		}
 
 		if err := f.Close(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s (%d): %v", v, k, err)
 		}
 	}
 
