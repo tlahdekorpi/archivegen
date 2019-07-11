@@ -8,7 +8,9 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"syscall"
 	"text/tabwriter"
+	"unsafe"
 
 	"github.com/tlahdekorpi/archivegen/archive"
 	"github.com/tlahdekorpi/archivegen/archive/cpio"
@@ -18,6 +20,12 @@ import (
 )
 
 var buildversion string = "v0"
+
+func isterm(file *os.File) bool {
+	var t [44]byte // sizeof(struct termios/termios2)
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, file.Fd(), ioctl, uintptr(unsafe.Pointer(&t)))
+	return err == 0
+}
 
 func open(file string) *os.File {
 	r, err := os.OpenFile(
@@ -70,14 +78,6 @@ func printTree(t *tree.Node, b64 bool) {
 	tw.Flush()
 }
 
-func stdinPipe() bool {
-	f, err := os.Stdin.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return (f.Mode() & os.ModeCharDevice) == 0
-}
-
 type varValue []string
 
 func (v *varValue) String() string { return "" }
@@ -109,7 +109,6 @@ func main() {
 	log.SetPrefix("archivegen: ")
 
 	opt := opts{
-		Out:    "out.archive",
 		Format: "tar",
 	}
 	buildflags(&opt, "")
@@ -142,12 +141,12 @@ func main() {
 		return
 	}
 
-	p := stdinPipe()
-	if flag.NArg() < 1 && !p {
+	stdin, stdout := isterm(os.Stdin), isterm(os.Stdout)
+	if flag.NArg() < 1 && stdin {
 		log.Fatal("not enough arguments")
 	}
 
-	root, err := loadTree(opt.Rootfs, []string(varX), flag.Args(), p)
+	root, err := loadTree(opt.Rootfs, []string(varX), flag.Args(), !stdin)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,8 +157,10 @@ func main() {
 	}
 
 	var out *os.File = os.Stdout
-	if !opt.Stdout {
+	if opt.Out != "" {
 		out = open(opt.Out)
+	} else if stdout && !opt.Stdout {
+		log.Fatal("stdout is terminal, use -stdout")
 	}
 
 	buf := bufio.NewWriterSize(out, 1<<24)
