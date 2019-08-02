@@ -33,5 +33,5 @@ type Header struct {
 type Writer interface {
 	io.WriteCloser
 	WriteHeader(hdr *Header) error
-	Symlink(src, dst string, uid, gid int) error
+	Symlink(src, dst string, uid, gid, mode int) error
 }

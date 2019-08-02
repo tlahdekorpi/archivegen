@@ -83,11 +83,11 @@ func (w *writer) WriteHeader(hdr *archive.Header) error {
 	return w.cw.WriteHeader(hdrconv(hdr, w.t))
 }
 
-func (w *writer) Symlink(src, dst string, uid, gid int) error {
+func (w *writer) Symlink(src, dst string, uid, gid, mode int) error {
 	hdr := &cpio.Header{
 		Name: dst,
 		Size: int64(len(src)),
-		Mode: 0777,
+		Mode: mode,
 		Uid:  uid,
 		Gid:  gid,
 		Type: cpio.TypeSymlink,

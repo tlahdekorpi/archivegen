@@ -73,12 +73,12 @@ func (w *writer) WriteHeader(hdr *archive.Header) error {
 	return w.tw.WriteHeader(hdrconv(hdr, w.t))
 }
 
-func (w *writer) Symlink(src, dst string, uid, gid int) error {
+func (w *writer) Symlink(src, dst string, uid, gid, mode int) error {
 	hdr := &tar.Header{
 		Name:     dst,
 		Linkname: src,
 		Size:     0,
-		Mode:     0777,
+		Mode:     int64(mode),
 		Uid:      uid,
 		Gid:      gid,
 		Typeflag: tar.TypeSymlink,

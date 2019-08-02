@@ -34,7 +34,7 @@ d a/b/c 0700 1 1
 
 **`l`** Symlink
 ```sh
-# l *src *dst uid gid
+# l *src *dst mode uid gid
 # source and destination are reversed
 # usr/bin/sh is a symlink to busybox
 l busybox usr/bin/sh

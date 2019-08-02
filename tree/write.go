@@ -98,7 +98,7 @@ func Write(e config.Entry, w archive.Writer) error {
 		return writeDir(w, e.Src, e.Mode, e.User, e.Group)
 
 	case config.TypeSymlink:
-		return w.Symlink(e.Src, e.Dst, e.User, e.Group)
+		return w.Symlink(e.Src, e.Dst, e.User, e.Group, e.Mode)
 
 	case config.TypeBase64:
 		d := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
