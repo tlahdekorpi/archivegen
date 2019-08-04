@@ -516,6 +516,8 @@ func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
 		x.gid = &e.Group
 	}
 
+	x.e.Src = ""
+
 	for _, v := range r {
 		s, err := os.Lstat(v)
 		if err := x.walkFunc(v, s, err); err != nil {
