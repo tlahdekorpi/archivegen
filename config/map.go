@@ -17,6 +17,9 @@ var Opt struct {
 		EmptyGlob bool `desc:"Glob types don't return any matches"`
 		Replace   bool `desc:"Entry is replaced"`
 	}
+	ELF struct {
+		Expand bool `desc:"Resolve all ELF source symlinks"`
+	}
 }
 
 const (
@@ -344,6 +347,12 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		src = rootPrefix(e.Src, rootfs)
 	} else {
 		src = e.Src
+	}
+
+	if Opt.ELF.Expand {
+		if src, err = m.expand(src, rootfs); err != nil {
+			return err
+		}
 	}
 
 	m.Add(Entry{
