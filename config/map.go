@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	stdelf "debug/elf"
+
 	"github.com/tlahdekorpi/archivegen/elf"
 )
 
@@ -18,7 +20,8 @@ var Opt struct {
 		Replace   bool `desc:"Entry is replaced"`
 	}
 	ELF struct {
-		Expand bool `desc:"Resolve all ELF source symlinks"`
+		Expand   bool `desc:"Resolve all ELF source symlinks"`
+		Fallback bool `desc:"Fallback to adding a file on ELF format errors"`
 	}
 }
 
@@ -337,12 +340,11 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		r, err = elf.Resolve(e.Src)
 	}
 
-	if err != nil {
+	if err != nil && !Opt.ELF.Fallback {
 		return err
 	}
 
 	var src string
-
 	if e.Type != TypeLinkedAbs {
 		src = rootPrefix(e.Src, rootfs)
 	} else {
@@ -350,8 +352,9 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 	}
 
 	if Opt.ELF.Expand {
-		if src, err = m.expand(src, rootfs); err != nil {
-			return err
+		var errx error
+		if src, errx = m.expand(src, rootfs); errx != nil {
+			return errx
 		}
 	}
 
@@ -364,6 +367,14 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		TypeRegular,
 		"", nil,
 	})
+
+	if err != nil && Opt.ELF.Fallback {
+		switch err.(type) {
+		case *stdelf.FormatError:
+			return nil
+		}
+		return err
+	}
 
 	for _, v := range r {
 		// '/usr/lib/lib.so'
