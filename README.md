@@ -47,6 +47,9 @@ f /a/b/c/file foo/bar/baz
 
 # destination is the source when omitted
 f /a/b/c/file
+
+# files prefixed with ? are omitted if they don't exist
+?fr /optional
 ```
 
 **`R, Rr`** Recursive

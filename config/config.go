@@ -191,6 +191,19 @@ func (l lineError) Error() string {
 	return fmt.Sprintf("%s, line %d", l.err.Error(), l.line)
 }
 
+func failable(e []string) (bool, error) {
+	if e[idxType][0] != '?' {
+		return false, nil
+	}
+
+	e[idxType] = e[idxType][1:]
+	if e[idxType][0] != 'f' {
+		return false, errInvalidEntry
+	}
+
+	return true, nil
+}
+
 func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 	s := bufio.NewScanner(r)
 	m := newMap(vars)
@@ -242,7 +255,12 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 			return nil, lineError{n, errNoArguments}
 		}
 
-		if err := m.add(f, rootfs); err != nil {
+		fail, err := failable(f)
+		if err != nil {
+			return nil, lineError{n, err}
+		}
+
+		if err := m.add(f, rootfs, fail); err != nil {
 			return nil, lineError{n, err}
 		}
 	}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -156,7 +157,7 @@ func multi(s string) []string {
 	return r
 }
 
-func (m *Map) add(e entry, rootfs *string) error {
+func (m *Map) add(e entry, rootfs *string, fail bool) error {
 	for k, _ := range e {
 		e[k] = m.v.r.Replace(e[k])
 	}
@@ -212,7 +213,7 @@ func (m *Map) add(e entry, rootfs *string) error {
 
 			e[idx] = v
 
-			err := m.add(e, rootfs)
+			err := m.add(e, rootfs, fail)
 			if err != nil {
 				return err
 			}
@@ -272,6 +273,16 @@ func (m *Map) add(e entry, rootfs *string) error {
 			e.isSet(idxGroup),
 			rootfs,
 		)
+	case TypeRegular:
+		if !fail {
+			break
+		}
+		_, err := os.Stat(E.Src)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		} else if err != nil {
+			return err
+		}
 	}
 
 	if i, exists := m.m[E.Dst]; exists {
