@@ -1,14 +1,14 @@
 package elf
 
 import (
+	"bytes"
 	"debug/elf"
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
-
-const ldConfigDir = "/etc/ld.so.conf.d"
 
 // overridden in testing
 var open = eopen
@@ -399,25 +399,28 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, re
 	return nil
 }
 
-func ldList(dir string) ([]string, error) {
+func ldglob(glob string) ([]string, error) {
 	var r []string
 
-	d, err := ioutil.ReadDir(dir)
+	g, err := filepath.Glob(glob)
 	if err != nil {
 		// non-fatal
 		return r, nil
 	}
 
-	for _, v := range d {
-		if v.IsDir() {
-			continue
-		}
-		f, err := ioutil.ReadFile(path.Join(dir, v.Name()))
+	m := make(set)
+	for _, v := range g {
+		f, err := ioutil.ReadFile(v)
 		if err != nil {
 			return nil, err
 		}
-		data := strings.TrimRight(string(f), "\n")
-		r = append(r, strings.Split(data, "\n")...)
+
+		for _, p := range bytes.Fields(f) {
+			p := path.Clean(string(p))
+			if !m.add(p) {
+				r = append(r, p)
+			}
+		}
 	}
 
 	return r, nil
@@ -428,32 +431,42 @@ var defaultLibs = mkpe([]string{
 	"/usr/lib64",
 	"/lib",
 	"/usr/lib",
-	// freebsd
-	// "/usr/lib/compat",
-	// "/usr/local/lib",
 })
 
-var defaultcache = newfileset()
+var (
+	ctxcache     = newfileset()
+	resolvecache = make(map[string][]string)
+
+	ldconf []string
+)
 
 func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
-	var ctx context
-	ctx.err = make(set)
-	ctx.abs = abs
+	file = rootprefix(file, rootfs, abs)
+	if r, ok := resolvecache[file]; ok {
+		return r, nil
+	}
+
+	ctx := context{
+		err:  make(set),
+		abs:  abs,
+		root: rootfs,
+	}
 	if cache {
-		ctx.cache = defaultcache
+		ctx.cache = ctxcache
 	}
 
-	dir := rootprefix(path.Dir(file), rootfs, abs)
-
-	if config, err := ldList(
-		rootprefix(ldConfigDir, rootfs, false),
-	); err != nil {
-		return nil, err
-	} else {
-		ctx.ldconf = ctx.ldconf.add(dir, config...)
+	if cache && ldconf == nil {
+		var err error
+		if ldconf, err = ldglob(
+			rootprefix("/etc/ld.so.conf.d/*.conf", rootfs, false),
+		); err != nil {
+			return nil, err
+		}
 	}
 
-	f, err := open(rootprefix(file, rootfs, abs))
+	ctx.ldconf = ctx.ldconf.add(path.Dir(file), ldconf...)
+
+	f, err := open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +476,6 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 	} else {
 		ctx.class = e.Class
 	}
-	ctx.root = rootfs
 
 	ret := make(set)
 	if i, err := readinterp(f); err == nil {
@@ -473,7 +485,7 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 	} */
 
 	if err := ctx.resolv(
-		rootprefix(file, rootfs, abs),
+		file,
 		f,
 		make(pathset),
 		nil,
@@ -488,7 +500,9 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 		}
 	}
 
-	return ret.list(), nil
+	list := ret.list()
+	resolvecache[file] = list
+	return list, nil
 }
 
 // Resolve resolves libraries needed by an ELF file.
