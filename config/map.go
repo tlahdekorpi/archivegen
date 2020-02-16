@@ -361,11 +361,23 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		return err
 	}
 
+	var osrc string
 	if Opt.ELF.Expand {
-		var errx error
-		if src, errx = m.expand(src, rootfs); errx != nil {
-			return errx
+		osrc = src
+		if nsrc, err := m.expand(src, rootfs); err != nil {
+			return err
+		} else {
+			src = nsrc
 		}
+	}
+
+	if strings.TrimLeft(e.Src, "/") == e.Dst {
+		if rootfs != nil && e.Type != TypeLinkedAbs {
+			e.Dst = strings.TrimPrefix(src, *rootfs)
+		} else {
+			e.Dst = src
+		}
+		e.Dst = strings.TrimLeft(e.Dst, "/")
 	}
 
 	m.Add(Entry{
@@ -388,13 +400,12 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 
 	for _, v := range r {
 		// '/usr/lib/lib.so'
-
-		if v == src {
+		switch v {
+		case src, osrc:
 			continue
 		}
 
 		var err error
-
 		v, err = m.expand(v, rootfs)
 		if err != nil {
 			return err
