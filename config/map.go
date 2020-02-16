@@ -22,6 +22,7 @@ var Opt struct {
 	ELF struct {
 		Expand   bool `desc:"Resolve all ELF source symlinks"`
 		Fallback bool `desc:"Fallback to adding a file on ELF format errors"`
+		Once     bool `desc:"Only add ELFs once"`
 	}
 }
 
@@ -329,7 +330,23 @@ func trimPrefix(file string, rootfs *string) string {
 	return strings.TrimPrefix(file, *rootfs)
 }
 
+var elfAdded = make(map[string]struct{})
+
 func (m *Map) addElf(e Entry, rootfs *string) error {
+	var src string
+	if e.Type != TypeLinkedAbs {
+		src = rootPrefix(e.Src, rootfs)
+	} else {
+		src = e.Src
+	}
+
+	if Opt.ELF.Once {
+		if _, ok := elfAdded[src]; ok {
+			return nil
+		}
+		elfAdded[src] = struct{}{}
+	}
+
 	var (
 		r   []string
 		err error
@@ -342,13 +359,6 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 
 	if err != nil && !Opt.ELF.Fallback {
 		return err
-	}
-
-	var src string
-	if e.Type != TypeLinkedAbs {
-		src = rootPrefix(e.Src, rootfs)
-	} else {
-		src = e.Src
 	}
 
 	if Opt.ELF.Expand {
