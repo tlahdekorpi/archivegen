@@ -32,6 +32,7 @@ func split(a []string) []string {
 type pt struct {
 	id     int
 	origin bool
+	class  elf.Class
 }
 
 type pathset map[string]pt
@@ -91,7 +92,7 @@ func (p pathset) add(origin string, s ...string) pathset {
 			r = r.copy()
 			c = true
 		}
-		r[v] = pt{len(r), o}
+		r[v] = pt{len(r), o, elf.ELFCLASSNONE}
 	}
 
 	return r
@@ -100,6 +101,13 @@ func (p pathset) add(origin string, s ...string) pathset {
 type pe struct {
 	path   string
 	origin bool
+	class  elf.Class
+}
+
+func (p pathset) set(s string, c elf.Class) {
+	v := p[s]
+	v.class = c
+	p[s] = v
 }
 
 func (p pathset) list() []pe {
@@ -107,7 +115,7 @@ func (p pathset) list() []pe {
 	r := make([]pe, i)
 
 	for k, v := range p {
-		r[v.id] = pe{k, v.origin}
+		r[v.id] = pe{k, v.origin, v.class}
 	}
 
 	return r
@@ -217,6 +225,10 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 	var r string
 
 	for _, v := range from {
+		if v.class != elf.ELFCLASSNONE && v.class != c.class {
+			continue
+		}
+
 		dir := v.path
 		if file[0] != '/' {
 			// relative path
@@ -260,6 +272,7 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 
 		if e, ok := f.(*elf.File); ok {
 			if e.Class != c.class {
+				c.ldconf.set(v.path, e.Class)
 				if err := f.Close(); err != nil {
 					return "", nil, err
 				}
@@ -308,7 +321,7 @@ func (c *context) search(file string, ret set, path ...[]pe) (string, elfFile, e
 func mkpe(p []string) []pe {
 	r := make([]pe, len(p))
 	for i := 0; i < len(p); i++ {
-		r[i] = pe{p[i], false}
+		r[i] = pe{p[i], false, elf.ELFCLASSNONE}
 	}
 	return r
 }
@@ -355,7 +368,11 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, re
 	if len(runpath) > 0 {
 		x := tokenExpander(rd)
 		for k, v := range runpath {
-			runpath[k] = pe{x.Replace(v.path), isorigin(v.path)}
+			runpath[k] = pe{
+				x.Replace(v.path),
+				isorigin(v.path),
+				elf.ELFCLASSNONE,
+			}
 		}
 	}
 
