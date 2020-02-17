@@ -42,6 +42,7 @@ const (
 	TypeLinked       = "L"
 	TypeLinkedGlob   = "gL"
 	TypeLinkedAbs    = "LA"
+	TypeLibrary      = "i"
 	TypeBase64       = "b64"
 	TypeVariable     = "$"
 )
@@ -251,6 +252,9 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 	case
 		TypeLinkedGlob:
 		return m.addElfGlob(E, rootfs)
+	case
+		TypeLibrary:
+		return m.addElfLib(E, rootfs)
 	case
 		TypeLinkedAbs,
 		TypeLinked:
@@ -598,4 +602,15 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 		}
 	}
 	return nil
+}
+
+func (m *Map) addElfLib(e Entry, rootfs *string) error {
+	var err error
+	e.Src, err = elf.Find(e.Src, rootfs, stdelf.ELFCLASSNONE)
+	if err != nil {
+		return err
+	}
+
+	e.Dst = clean(e.Src)
+	return m.addElf(e, rootfs)
 }

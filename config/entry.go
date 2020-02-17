@@ -66,6 +66,7 @@ func (e entry) Src() (string, error) {
 		TypeCreate,
 		TypeCreateNoEndl,
 		TypeBase64,
+		TypeLibrary,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
 		TypeLinked:
@@ -118,6 +119,7 @@ func (e entry) Dst() (string, error) {
 		return clean(e[1]), nil
 
 	case
+		TypeLibrary,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
 		TypeLinked:
@@ -286,6 +288,7 @@ func (e entry) heredoc() string {
 func (e entry) Root() *string {
 	switch e.Type() {
 	case
+		TypeLibrary,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
 		TypeLinked:

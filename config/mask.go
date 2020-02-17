@@ -158,6 +158,7 @@ func regexReplaceMask(e entry) (maskFunc, error) {
 	return func(E *Entry) bool {
 		switch E.Type {
 		case
+			TypeLibrary,
 			TypeLinked,
 			TypeLinkedGlob,
 			TypeRecursive:
@@ -181,6 +182,7 @@ func regexIgnoreMask(e entry, neg bool) (maskFunc, error) {
 	return func(E *Entry) bool {
 		switch E.Type {
 		case
+			TypeLibrary,
 			TypeLinked,
 			TypeLinkedGlob,
 			TypeRecursive:
@@ -224,6 +226,7 @@ func regexModeMask(e entry) (maskFunc, error) {
 	return func(E *Entry) bool {
 		switch E.Type {
 		case
+			TypeLibrary,
 			TypeLinked,
 			TypeLinkedGlob,
 			TypeRecursive:

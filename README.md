@@ -91,7 +91,7 @@ $variable
 !
 ```
 
-**`L, LA, gL`** ELF
+**`L, LA, gL, i`** ELF
 ```sh
 # L *src dst mode uid gid
 # src and all dependencies are read from rootfs
@@ -102,6 +102,9 @@ L /usr/bin/bash
 # gL *src - - uid gid
 # dst and mode are ignored
 gL /usr/lib/httpd/modules/*.so
+
+# search library paths
+i libnss_files.so.2
 ```
 
 ### Repeating entries
