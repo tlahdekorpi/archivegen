@@ -482,7 +482,8 @@ var (
 	ctxcache     = newfileset()
 	resolvecache = make(map[string][]string)
 
-	ldconf []string
+	ldconf       []string
+	defaultclass elf.Class
 )
 
 func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
@@ -517,6 +518,10 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 
 	if e, ok := f.(*elf.File); ok {
 		ctx.class = e.Class
+	}
+
+	if defaultclass == elf.ELFCLASSNONE {
+		defaultclass = ctx.class
 	}
 
 	ret := make(set)
@@ -555,4 +560,48 @@ func Resolve(file string) ([]string, error) {
 // ResolveRoot searches libraries from rootfs. If abs, file will not prefixed with rootfs.
 func ResolveRoot(file, rootfs string, abs bool) ([]string, error) {
 	return resolve(file, &rootfs, abs, true)
+}
+
+func classmatch(file string, class elf.Class) bool {
+	f, err := elf.Open(file)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	return class == f.Class
+}
+
+// Find searches files with matching class from ld.conf and default paths.
+func Find(file string, rootfs *string, class elf.Class) (string, error) {
+	if defaultclass == elf.ELFCLASSNONE {
+		defaultclass = elf.ELFCLASS64
+	}
+
+	if class == elf.ELFCLASSNONE {
+		class = defaultclass
+	}
+
+	if ldconf == nil {
+		if r, err := ldglob(Opt.LDGlob, rootfs, false); err != nil {
+			return "", err
+		} else {
+			ldconf = r
+		}
+	}
+
+	for _, v := range ldconf {
+		p := path.Join(rootprefix(v, rootfs, false), file)
+		if classmatch(p, class) {
+			return path.Join(v, file), nil
+		}
+	}
+
+	for _, v := range defaultLibs {
+		p := path.Join(rootprefix(v.path, rootfs, false), file)
+		if classmatch(p, class) {
+			return path.Join(v.path, file), nil
+		}
+	}
+
+	return "", errorNotFound(file)
 }
