@@ -16,6 +16,7 @@ import (
 	"github.com/tlahdekorpi/archivegen/archive/cpio"
 	"github.com/tlahdekorpi/archivegen/archive/tar"
 	"github.com/tlahdekorpi/archivegen/config"
+	"github.com/tlahdekorpi/archivegen/elf"
 	"github.com/tlahdekorpi/archivegen/tree"
 )
 
@@ -113,6 +114,9 @@ func main() {
 	}
 	buildflags(&opt, "")
 	buildflags(&config.Opt, "")
+
+	elf.Opt.LDGlob = "/etc/ld.so.conf"
+	buildflags(&elf.Opt, "elf.")
 
 	var varX varValue
 	flag.Var(&varX, "X", "Variable\n"+

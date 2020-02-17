@@ -37,7 +37,7 @@ func mapOpen(d map[string]ef) func(f string) (elfFile, error) {
 	return func(f string) (elfFile, error) {
 		r, exists := d[f]
 		if !exists {
-			return nil, errorNotFound{f}
+			return nil, errorNotFound(f)
 		}
 		return r, nil
 	}

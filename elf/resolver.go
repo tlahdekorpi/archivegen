@@ -1,24 +1,22 @@
 package elf
 
 import (
-	"bytes"
+	"bufio"
 	"debug/elf"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 )
 
-// overridden in testing
-var open = eopen
-
-type errorNotFound struct {
-	e string
+var Opt struct {
+	LDGlob string `desc:"ld.conf glob"`
 }
 
+type errorNotFound string
+
 func (e errorNotFound) Error() string {
-	return "resolver: not found: " + e.e
+	return "resolver: not found: " + string(e)
 }
 
 func split(a []string) []string {
@@ -283,7 +281,7 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 		return r, f, nil
 	}
 
-	return r, nil, errorNotFound{r}
+	return r, nil, errorNotFound(r)
 }
 
 func (c *context) search(file string, ret set, path ...[]pe) (string, elfFile, error) {
@@ -416,10 +414,10 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, re
 	return nil
 }
 
-func ldglob(glob string) ([]string, error) {
+func ldglob(glob string, rootfs *string, abs bool) ([]string, error) {
 	var r []string
 
-	g, err := filepath.Glob(glob)
+	g, err := filepath.Glob(rootprefix(glob, rootfs, abs))
 	if err != nil {
 		// non-fatal
 		return r, nil
@@ -427,13 +425,43 @@ func ldglob(glob string) ([]string, error) {
 
 	m := make(set)
 	for _, v := range g {
-		f, err := ioutil.ReadFile(v)
+		f, err := os.Open(v)
 		if err != nil {
 			return nil, err
 		}
+		defer f.Close()
 
-		for _, p := range bytes.Fields(f) {
-			p := path.Clean(string(p))
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			if err := s.Err(); err != nil {
+				return nil, err
+			}
+
+			t := s.Text()
+			if len(t) == 0 || t[0] == '#' {
+				continue
+			}
+
+			if i := strings.Fields(t); len(i) > 1 {
+				if i[0] != "include" {
+					continue
+				}
+
+				fi := i[1]
+				if abs = path.IsAbs(fi); !abs {
+					fi = path.Join(path.Dir(v), fi)
+				}
+
+				rr, err := ldglob(fi, rootfs, !abs)
+				if err != nil {
+					return nil, err
+				}
+
+				r = append(r, rr...)
+				continue
+			}
+
+			p := path.Clean(t)
 			if !m.add(p) {
 				r = append(r, p)
 			}
@@ -464,9 +492,10 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 	}
 
 	ctx := context{
-		err:  make(set),
-		abs:  abs,
-		root: rootfs,
+		err:   make(set),
+		abs:   abs,
+		root:  rootfs,
+		class: elf.ELFCLASS64,
 	}
 	if cache {
 		ctx.cache = ctxcache
@@ -474,9 +503,7 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 
 	if cache && ldconf == nil {
 		var err error
-		if ldconf, err = ldglob(
-			rootprefix("/etc/ld.so.conf.d/*.conf", rootfs, false),
-		); err != nil {
+		if ldconf, err = ldglob(Opt.LDGlob, rootfs, false); err != nil {
 			return nil, err
 		}
 	}
@@ -488,9 +515,7 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 		return nil, err
 	}
 
-	if e, ok := f.(*elf.File); !ok {
-		ctx.class = elf.ELFCLASS64
-	} else {
+	if e, ok := f.(*elf.File); ok {
 		ctx.class = e.Class
 	}
 
@@ -512,9 +537,9 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 	}
 
 	if len(ctx.err) > 0 {
-		return nil, errorNotFound{
+		return nil, errorNotFound(
 			strings.Join(ctx.err.list(), ", "),
-		}
+		)
 	}
 
 	list := ret.list()

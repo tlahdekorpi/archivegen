@@ -19,6 +19,9 @@ func eopen(file string) (elfFile, error) {
 	return elf.Open(file)
 }
 
+// overridden in testing
+var open = eopen
+
 func readinterp(file elfFile) (string, error) {
 	var (
 		f  *elf.File
