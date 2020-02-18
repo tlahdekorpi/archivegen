@@ -158,6 +158,44 @@ func multi(s string) []string {
 	return r
 }
 
+func alternate(s string) []string {
+	i := strings.IndexByte(s, '(')
+	if i < 0 {
+		return nil
+	}
+
+	e := strings.LastIndexByte(s[i:], ')')
+	if e < 0 {
+		return nil
+	}
+
+	a, b := s[:i], s[e+i+1:]
+
+	var r []string
+	for _, v := range strings.Split(s[i+1:i+e], "|") {
+		r = append(r, a+v+b)
+	}
+
+	if len(r) == 1 {
+		return nil
+	}
+	return r
+}
+
+func lookup(rootfs *string, t string, files ...string) (file string, err error) {
+	switch t {
+	case TypeLinkedAbs, TypeGlob, TypeRecursive, TypeRegular:
+		rootfs = nil
+	}
+	for _, file = range files {
+		_, err = os.Stat(rootPrefix(file, rootfs))
+		if err == nil {
+			break
+		}
+	}
+	return
+}
+
 func (m *Map) add(e entry, rootfs *string, fail bool) error {
 	for k, _ := range e {
 		e[k] = m.v.r.Replace(e[k])
@@ -228,14 +266,33 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 		return err
 	}
 
-	if m.mm.apply(&E) {
-		// ignored by mask
-		return nil
-	}
-
 	// entry rootfs takes priority
 	if r := e.Root(); r != nil {
 		rootfs = r
+	}
+
+	a := alternate(E.Src)
+	if a != nil {
+		E.Src, err = lookup(rootfs, e.Type(), a...)
+		if !e.isSet(idxDst) {
+			E.Dst = clean(E.Src)
+		}
+	}
+	if fail {
+		if a == nil {
+			_, err = lookup(rootfs, e.Type(), E.Src)
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	if m.mm.apply(&E) {
+		// ignored by mask
+		return nil
 	}
 
 	switch E.Type {
@@ -277,16 +334,6 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 			e.isSet(idxGroup),
 			rootfs,
 		)
-	case TypeRegular:
-		if !fail {
-			break
-		}
-		_, err := os.Stat(E.Src)
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		} else if err != nil {
-			return err
-		}
 	}
 
 	if i, exists := m.m[E.Dst]; exists {

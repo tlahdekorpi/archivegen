@@ -191,17 +191,11 @@ func (l lineError) Error() string {
 	return fmt.Sprintf("%s, line %d", l.err.Error(), l.line)
 }
 
-func failable(e []string) (bool, error) {
-	if e[idxType][0] != '?' {
-		return false, nil
+func failable(e []string) (ok bool) {
+	if ok = e[idxType][0] == '?'; ok {
+		e[idxType] = e[idxType][1:]
 	}
-
-	e[idxType] = e[idxType][1:]
-	if e[idxType][0] != 'f' {
-		return false, errInvalidEntry
-	}
-
-	return true, nil
+	return
 }
 
 func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
@@ -255,11 +249,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 			return nil, lineError{n, errNoArguments}
 		}
 
-		fail, err := failable(f)
-		if err != nil {
-			return nil, lineError{n, err}
-		}
-
+		fail := failable(f)
 		if err := m.add(f, rootfs, fail); err != nil {
 			return nil, lineError{n, err}
 		}
