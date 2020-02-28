@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strings"
 )
 
@@ -275,7 +274,15 @@ func FromReaderRoot(rootfs string, vars []string, r io.Reader) (*Map, error) {
 func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 	cfg := newMap(vars)
 	for k, v := range files {
-		f, err := os.Open(path.Clean(v))
+		var (
+			f   io.ReadCloser
+			err error
+		)
+		if v == "-" {
+			f = os.Stdin
+		} else {
+			f, err = os.Open(v)
+		}
 		if err != nil {
 			return nil, err
 		}

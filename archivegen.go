@@ -150,7 +150,7 @@ func main() {
 		log.Fatal("not enough arguments")
 	}
 
-	root, err := loadTree(opt.Rootfs, []string(varX), flag.Args(), !stdin)
+	root, err := loadTree(opt.Rootfs, []string(varX), flag.Args(), !stdin && flag.NArg() == 0)
 	if err != nil {
 		log.Fatal(err)
 	}
