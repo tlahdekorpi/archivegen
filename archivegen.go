@@ -129,6 +129,10 @@ func main() {
 	}
 	flag.Parse()
 
+	if config.Opt.Path == nil {
+		config.Opt.Path = strings.Split(os.Getenv("PATH"), ":")
+	}
+
 	if opt.Chdir != "" {
 		if err := os.Chdir(opt.Chdir); err != nil {
 			log.Fatal(err)

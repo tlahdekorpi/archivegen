@@ -4,6 +4,8 @@ import (
 	"flag"
 	"reflect"
 	"strings"
+
+	"github.com/tlahdekorpi/archivegen/config"
 )
 
 func set(name, desc string, v reflect.Value) {
@@ -12,6 +14,8 @@ func set(name, desc string, v reflect.Value) {
 		flag.StringVar(x, name, *x, desc)
 	case *bool:
 		flag.BoolVar(x, name, *x, desc)
+	case *config.PathVar:
+		flag.Var(x, name, desc)
 	default:
 		panic("flag")
 	}

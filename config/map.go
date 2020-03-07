@@ -15,6 +15,17 @@ import (
 	"github.com/tlahdekorpi/archivegen/elf"
 )
 
+type PathVar []string
+
+func (p *PathVar) String() string {
+	return ""
+}
+
+func (p *PathVar) Set(v string) error {
+	*p = strings.Split(v, ":")
+	return nil
+}
+
 var Opt struct {
 	Warn struct {
 		EmptyGlob bool `desc:"Glob types don't return any matches"`
@@ -25,6 +36,7 @@ var Opt struct {
 		Fallback bool `desc:"Fallback to adding a file on ELF format errors"`
 		Once     bool `desc:"Only add ELFs once"`
 	}
+	Path PathVar `desc:"Search path"`
 }
 
 const (
@@ -43,6 +55,7 @@ const (
 	TypeLinkedGlob   = "gL"
 	TypeLinkedAbs    = "LA"
 	TypeLibrary      = "i"
+	TypePath         = "p"
 	TypeBase64       = "b64"
 	TypeVariable     = "$"
 )
@@ -316,6 +329,9 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 		TypeLinkedAbs,
 		TypeLinked:
 		return m.addElf(E, rootfs)
+	case
+		TypePath:
+		return m.addPath(E, rootfs)
 	case
 		TypeRecursiveRel,
 		TypeRecursive:
@@ -659,5 +675,34 @@ func (m *Map) addElfLib(e Entry, rootfs *string) error {
 	}
 
 	e.Dst = clean(e.Src)
+	return m.addElf(e, rootfs)
+}
+
+func (m *Map) addPath(e Entry, rootfs *string) error {
+	var (
+		file string
+		err  error
+	)
+
+	if e.Src[0] == '/' {
+		return m.addElf(e, rootfs)
+	}
+
+	for _, v := range Opt.Path {
+		file = path.Join(v, e.Src)
+		_, err = os.Stat(rootPrefix(file, rootfs))
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	if e.Src == e.Dst {
+		e.Dst = clean(file)
+	}
+
+	e.Src = file
 	return m.addElf(e, rootfs)
 }

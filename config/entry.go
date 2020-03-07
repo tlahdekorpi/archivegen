@@ -66,6 +66,7 @@ func (e entry) Src() (string, error) {
 		TypeCreate,
 		TypeCreateNoEndl,
 		TypeBase64,
+		TypePath,
 		TypeLibrary,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
@@ -81,6 +82,18 @@ func (e entry) Src() (string, error) {
 
 func clean(file string) string {
 	p := path.Clean(file)
+	if p[0] != '/' {
+		return p
+	}
+	return p[1:]
+}
+
+func suffix(e entry) string {
+	p := path.Clean(e[2])
+	if strings.HasSuffix(e[2], "/") {
+		_, f := path.Split(e[1])
+		p = path.Join(p, f)
+	}
 	if p[0] != '/' {
 		return p
 	}
@@ -117,7 +130,12 @@ func (e entry) Dst() (string, error) {
 
 		// explicitly omitted dst
 		return clean(e[1]), nil
-
+	case
+		TypePath:
+		if len(e) > 2 && e[2] != TypeOmit {
+			return suffix(e), nil
+		}
+		return clean(e[1]), nil
 	case
 		TypeLibrary,
 		TypeLinkedAbs,
@@ -288,6 +306,7 @@ func (e entry) heredoc() string {
 func (e entry) Root() *string {
 	switch e.Type() {
 	case
+		TypePath,
 		TypeLibrary,
 		TypeLinkedAbs,
 		TypeLinkedGlob,
