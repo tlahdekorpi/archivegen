@@ -53,9 +53,8 @@ func typeconv(t archive.FileType) int {
 }
 
 func hdrconv(a *archive.Header, t bool) *cpio.Header {
-	var mtime int64
 	if t && a.Type == archive.TypeRegular {
-		mtime = a.ModTime.Unix()
+		a.Time = a.ModTime.Unix()
 	}
 
 	if a.Size >= max32 {
@@ -64,7 +63,7 @@ func hdrconv(a *archive.Header, t bool) *cpio.Header {
 	if a.Mode >= max32 {
 		panic("filemode " + a.Name)
 	}
-	if mtime >= max32 {
+	if a.Time >= max32 {
 		panic("mtime " + a.Name)
 	}
 
@@ -75,7 +74,7 @@ func hdrconv(a *archive.Header, t bool) *cpio.Header {
 		Size:  a.Size,
 		Mode:  int(a.Mode),
 		Type:  typeconv(a.Type),
-		Mtime: mtime,
+		Mtime: a.Time,
 	}
 }
 

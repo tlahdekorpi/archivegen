@@ -10,7 +10,7 @@ import (
 	"github.com/tlahdekorpi/archivegen/config"
 )
 
-func writeFile(w archive.Writer, src, dst string, mode, uid, gid int) error {
+func writeFile(w archive.Writer, src, dst string, mode, uid, gid int, time int64) error {
 	l, err := os.Stat(src)
 	if err != nil {
 		return err
@@ -33,6 +33,7 @@ func writeFile(w archive.Writer, src, dst string, mode, uid, gid int) error {
 		Uid:        uid,
 		Gid:        gid,
 		Type:       archive.TypeRegular,
+		Time:       time,
 		ModTime:    l.ModTime(),
 		ChangeTime: t.ctime,
 		AccessTime: t.atime,
@@ -69,7 +70,7 @@ func writeDir(w archive.Writer, dst string, mode, uid, gid int) error {
 	return nil
 }
 
-func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte) error {
+func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte, time int64) error {
 	hdr := &archive.Header{
 		Name: dst,
 		Size: int64(len(data)),
@@ -77,6 +78,7 @@ func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte) e
 		Uid:  uid,
 		Gid:  gid,
 		Type: archive.TypeRegular,
+		Time: time,
 	}
 	if err := w.WriteHeader(hdr); err != nil {
 		return err
@@ -92,7 +94,7 @@ func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte) e
 func Write(e config.Entry, w archive.Writer) error {
 	switch e.Type {
 	case config.TypeRegular:
-		return writeFile(w, e.Src, e.Dst, e.Mode, e.User, e.Group)
+		return writeFile(w, e.Src, e.Dst, e.Mode, e.User, e.Group, e.Time)
 
 	case config.TypeDirectory:
 		return writeDir(w, e.Src, e.Mode, e.User, e.Group)
@@ -109,7 +111,7 @@ func Write(e config.Entry, w archive.Writer) error {
 		e.Data = d[:n]
 		fallthrough
 	case config.TypeCreate, config.TypeCreateNoEndl:
-		return createFile(w, e.Dst, e.Mode, e.User, e.Group, e.Data)
+		return createFile(w, e.Dst, e.Mode, e.User, e.Group, e.Data, e.Time)
 	}
 
 	return fmt.Errorf("tree: write error: unknown type %q", e)

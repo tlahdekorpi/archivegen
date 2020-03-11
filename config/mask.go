@@ -12,6 +12,7 @@ const (
 	maskIgnore    = "mi"
 	maskIgnoreNeg = "mI"
 	maskReplace   = "mr"
+	maskTime      = "mt"
 )
 
 const (
@@ -132,6 +133,8 @@ func maskFromEntry(e entry) (maskFunc, error) {
 		return regexReplaceMask(e)
 	case maskMode:
 		return regexModeMask(e)
+	case maskTime:
+		return regexTimeMask(e)
 	case maskIgnore:
 		return regexIgnoreMask(e, false)
 	case maskIgnoreNeg:
@@ -247,6 +250,30 @@ func regexModeMask(e entry) (maskFunc, error) {
 		if uid != nil {
 			E.User = *uid
 		}
+		return false
+	}, nil
+}
+
+func regexTimeMask(e entry) (maskFunc, error) {
+	if len(e) < idxMaskMode {
+		return nil, errInvalidEntry
+	}
+
+	r, err := regexp.Compile(e[idxMaskRegexp])
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := strconv.Atoi(e[idxMaskMode])
+	if err != nil {
+		return nil, err
+	}
+
+	return func(E *Entry) bool {
+		if !r.MatchString(E.Dst) {
+			return false
+		}
+		E.Time = int64(t)
 		return false
 	}, nil
 }

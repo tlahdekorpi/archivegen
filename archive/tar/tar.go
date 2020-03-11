@@ -2,6 +2,7 @@ package tar
 
 import (
 	"io"
+	"time"
 
 	"archive/tar"
 
@@ -57,6 +58,12 @@ func hdrconv(a *archive.Header, t bool) *tar.Header {
 		Size:     a.Size,
 		Mode:     a.Mode,
 		Typeflag: typeconv(a.Type),
+	}
+	if a.Time > 0 {
+		r.ModTime = time.Unix(a.Time, 0)
+		r.ChangeTime = time.Unix(a.Time, 0)
+		r.AccessTime = time.Unix(a.Time, 0)
+		return r
 	}
 	if t && a.Type == archive.TypeRegular {
 		r.ModTime = a.ModTime

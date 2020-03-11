@@ -106,7 +106,7 @@ func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
 		0,
 		0777,
 		TypeSymlink,
-		"", nil,
+		"", 0, nil,
 	})
 
 	if x := strings.IndexByte(r, '/'); x >= 0 {

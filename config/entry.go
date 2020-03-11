@@ -34,6 +34,7 @@ type Entry struct {
 	Mode        int
 	Type        string
 	Heredoc     string
+	Time        int64
 	Data        []byte
 }
 

@@ -25,6 +25,7 @@ type Header struct {
 	Gid        int      // group id of owner.
 	Size       int64    // length in bytes.
 	Type       FileType // filetype.
+	Time       int64
 	ModTime    time.Time
 	ChangeTime time.Time
 	AccessTime time.Time

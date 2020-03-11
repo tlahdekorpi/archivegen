@@ -217,6 +217,7 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 	var err error
 	switch e.Type() {
 	case
+		maskTime,
 		maskReplace,
 		maskIgnore,
 		maskIgnoreNeg,
@@ -465,7 +466,7 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		e.Group,
 		0755,
 		TypeRegular,
-		"", nil,
+		"", 0, nil,
 	})
 
 	if err != nil && Opt.ELF.Fallback {
@@ -502,7 +503,7 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 			e.Group,
 			0755,
 			TypeRegular,
-			"", nil,
+			"", 0, nil,
 		})
 	}
 
@@ -578,7 +579,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			mode(info),
 			TypeDirectory,
-			"", nil,
+			"", 0, nil,
 		})
 		return nil
 	}
@@ -591,7 +592,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			mode(info),
 			TypeRegular,
-			"", nil,
+			"", 0, nil,
 		})
 		return nil
 	}
@@ -609,7 +610,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			0777,
 			TypeSymlink,
-			"", nil,
+			"", 0, nil,
 		})
 		return nil
 	}
