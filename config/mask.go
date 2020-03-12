@@ -13,6 +13,7 @@ const (
 	maskIgnoreNeg = "mI"
 	maskReplace   = "mr"
 	maskTime      = "mt"
+	maskLibrary   = "ml"
 )
 
 const (
@@ -135,6 +136,8 @@ func maskFromEntry(e entry) (maskFunc, error) {
 		return regexModeMask(e)
 	case maskTime:
 		return regexTimeMask(e)
+	case maskLibrary:
+		return regexLibraryMask(e)
 	case maskIgnore:
 		return regexIgnoreMask(e, false)
 	case maskIgnoreNeg:
@@ -274,6 +277,36 @@ func regexTimeMask(e entry) (maskFunc, error) {
 			return false
 		}
 		E.Time = int64(t)
+		return false
+	}, nil
+}
+
+func regexLibraryMask(e entry) (maskFunc, error) {
+	if len(e) < idxMaskMode {
+		return nil, errInvalidEntry
+	}
+
+	r, err := regexp.Compile(e[idxMaskRegexp])
+	if err != nil {
+		return nil, err
+	}
+
+	l := multi(e[idxMaskMode])
+
+	return func(E *Entry) bool {
+		if !r.MatchString(E.Dst) {
+			return false
+		}
+		switch E.Type {
+		case
+			TypeLibrary,
+			TypeLinked,
+			TypeLinkedAbs,
+			TypeLinkedGlob:
+		default:
+			return false
+		}
+		E.LibraryPath = l
 		return false
 	}, nil
 }

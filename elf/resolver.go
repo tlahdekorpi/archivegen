@@ -487,7 +487,7 @@ var (
 	defaultclass elf.Class
 )
 
-func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
+func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]string, error) {
 	file = rootprefix(file, rootfs, abs)
 	if r, ok := resolvecache[file]; ok {
 		return r, nil
@@ -510,6 +510,9 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 		}
 	}
 
+	if ld != nil {
+		ctx.ldconf = ctx.ldconf.add(path.Dir(file), ld...)
+	}
 	ctx.ldconf = ctx.ldconf.add(path.Dir(file), ldconf...)
 
 	f, err := open(file)
@@ -554,13 +557,13 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 }
 
 // Resolve resolves libraries needed by an ELF file.
-func Resolve(file string) ([]string, error) {
-	return resolve(file, nil, true, true)
+func Resolve(file string, ld []string) ([]string, error) {
+	return resolve(file, nil, true, true, ld)
 }
 
 // ResolveRoot searches libraries from rootfs. If abs, file will not prefixed with rootfs.
-func ResolveRoot(file, rootfs string, abs bool) ([]string, error) {
-	return resolve(file, &rootfs, abs, true)
+func ResolveRoot(file, rootfs string, abs bool, ld []string) ([]string, error) {
+	return resolve(file, &rootfs, abs, true, ld)
 }
 
 func classmatch(file string, class elf.Class) bool {

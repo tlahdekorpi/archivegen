@@ -36,6 +36,7 @@ type Entry struct {
 	Heredoc     string
 	Time        int64
 	Data        []byte
+	LibraryPath []string
 }
 
 func (e entry) Type() string {
