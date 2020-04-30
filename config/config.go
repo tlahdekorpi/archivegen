@@ -249,7 +249,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 		}
 
 		fail := failable(f)
-		if err := m.add(f, rootfs, fail); err != nil {
+		if err := m.add(f, rootfs, fail, n); err != nil {
 			return nil, lineError{n, err}
 		}
 	}
@@ -257,6 +257,13 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 	if err := s.Err(); err != nil {
 		return nil, lineError{n, err}
 	}
+
+	if Opt.ELF.Concurrent {
+		if err := m.includeElfs(); err != nil {
+			return nil, err
+		}
+	}
+
 	return m, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var Opt struct {
@@ -16,7 +17,7 @@ var Opt struct {
 type errorNotFound string
 
 func (e errorNotFound) Error() string {
-	return "resolver: not found: " + string(e)
+	return "resolve " + string(e) + ": not found"
 }
 
 func split(a []string) []string {
@@ -159,18 +160,19 @@ func (s set) list() []string {
 }
 
 type fileset struct {
+	mu    sync.Mutex
 	dirs  set
 	files set
 }
 
-func newfileset() fileset {
-	return fileset{
+func newfileset() *fileset {
+	return &fileset{
 		dirs:  make(set),
 		files: make(set),
 	}
 }
 
-func (f fileset) add(dir string) {
+func (f *fileset) add(dir string) {
 	if f.dirs.add(dir) {
 		return
 	}
@@ -201,19 +203,22 @@ func (f fileset) add(dir string) {
 	}
 }
 
-func (f fileset) ok(dir, file string) bool {
+func (f *fileset) ok(dir, file string) bool {
+	f.mu.Lock()
 	if f.dirs == nil {
+		f.mu.Unlock()
 		return true
 	}
 
 	f.add(dir)
 	_, ok := f.files[file]
+	f.mu.Unlock()
 	return ok
 }
 
 type context struct {
 	err    set
-	cache  fileset
+	cache  *fileset
 	ldconf pathset
 	class  elf.Class
 	root   *string
@@ -252,7 +257,7 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 			"/usr/lib":
 			break
 		default:
-			if !c.cache.ok(dir, r) {
+			if c.cache != nil && !c.cache.ok(dir, r) {
 				continue
 			}
 		}
@@ -480,6 +485,7 @@ var defaultLibs = mkpe([]string{
 })
 
 var (
+	mu           = new(sync.Mutex)
 	ctxcache     = newfileset()
 	resolvecache = make(map[string][]string)
 
@@ -489,9 +495,13 @@ var (
 
 func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]string, error) {
 	file = rootprefix(file, rootfs, abs)
+
+	mu.Lock()
 	if r, ok := resolvecache[file]; ok {
+		mu.Unlock()
 		return r, nil
 	}
+	mu.Unlock()
 
 	ctx := context{
 		err:   make(set),
@@ -503,9 +513,11 @@ func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]strin
 		ctx.cache = ctxcache
 	}
 
+	mu.Lock()
 	if cache && ldconf == nil {
 		var err error
 		if ldconf, err = ldglob(Opt.LDGlob, rootfs, false); err != nil {
+			mu.Unlock()
 			return nil, err
 		}
 	}
@@ -514,6 +526,7 @@ func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]strin
 		ctx.ldconf = ctx.ldconf.add(path.Dir(file), ld...)
 	}
 	ctx.ldconf = ctx.ldconf.add(path.Dir(file), ldconf...)
+	mu.Unlock()
 
 	f, err := open(file)
 	if err != nil {
@@ -524,9 +537,11 @@ func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]strin
 		ctx.class = e.Class
 	}
 
+	mu.Lock()
 	if defaultclass == elf.ELFCLASSNONE {
 		defaultclass = ctx.class
 	}
+	mu.Unlock()
 
 	ret := make(set)
 	if i, err := readinterp(f); err == nil {
@@ -552,18 +567,15 @@ func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]strin
 	}
 
 	list := ret.list()
+	mu.Lock()
 	resolvecache[file] = list
+	mu.Unlock()
 	return list, nil
 }
 
-// Resolve resolves libraries needed by an ELF file.
-func Resolve(file string, ld []string) ([]string, error) {
-	return resolve(file, nil, true, true, ld)
-}
-
 // ResolveRoot searches libraries from rootfs. If abs, file will not prefixed with rootfs.
-func ResolveRoot(file, rootfs string, abs bool, ld []string) ([]string, error) {
-	return resolve(file, &rootfs, abs, true, ld)
+func Resolve(file string, rootfs *string, abs bool, ld []string) ([]string, error) {
+	return resolve(file, rootfs, abs, true, ld)
 }
 
 func classmatch(file string, class elf.Class) bool {
@@ -577,6 +589,9 @@ func classmatch(file string, class elf.Class) bool {
 
 // Find searches files with matching class from ld.conf and default paths.
 func Find(file string, rootfs *string, class elf.Class) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if defaultclass == elf.ELFCLASSNONE {
 		defaultclass = elf.ELFCLASS64
 	}

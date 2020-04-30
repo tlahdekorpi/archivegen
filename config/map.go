@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	stdelf "debug/elf"
@@ -32,9 +33,11 @@ var Opt struct {
 		Replace   bool `desc:"Entry is replaced"`
 	}
 	ELF struct {
-		Expand   bool `desc:"Resolve all ELF source symlinks"`
-		Fallback bool `desc:"Fallback to adding a file on ELF format errors"`
-		Once     bool `desc:"Only add ELFs once"`
+		Expand       bool `desc:"Resolve all ELF source symlinks"`
+		Fallback     bool `desc:"Fallback to adding a file on ELF format errors"`
+		Once         bool `desc:"Only add ELFs once"`
+		Concurrent   bool `desc:"Load ELFs concurrently, results are added to the end of the archive"`
+		NumGoroutine int  `desc:"Number of goroutines resolving ELFs"`
 	}
 	Path PathVar `desc:"Search path"`
 }
@@ -126,6 +129,15 @@ func (m *variableMap) add(e entry) error {
 	return nil
 }
 
+type result struct {
+	mm     maskMap
+	libs   []string
+	e      Entry
+	rootfs *string
+	src    string
+	err    error
+}
+
 type Map struct {
 	// overlapping entries will be
 	// replaced by subsequent entries.
@@ -139,6 +151,10 @@ type Map struct {
 
 	// variable map
 	v *variableMap
+
+	wg  sync.WaitGroup
+	mu  sync.Mutex
+	elf []*result
 }
 
 func newMap(vars []string) *Map {
@@ -209,7 +225,7 @@ func lookup(rootfs *string, t string, files ...string) (file string, err error) 
 	return
 }
 
-func (m *Map) add(e entry, rootfs *string, fail bool) error {
+func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 	for k, _ := range e {
 		e[k] = m.v.r.Replace(e[k])
 	}
@@ -267,7 +283,7 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 
 			e[idx] = v
 
-			err := m.add(e, rootfs, fail)
+			err := m.add(e, rootfs, fail, line)
 			if err != nil {
 				return err
 			}
@@ -277,6 +293,7 @@ func (m *Map) add(e entry, rootfs *string, fail bool) error {
 	}
 
 	E, err := e.Entry()
+	E.Line = line
 	if err != nil {
 		return err
 	}
@@ -410,6 +427,134 @@ func trimPrefix(file string, rootfs *string) string {
 	return strings.TrimPrefix(file, *rootfs)
 }
 
+var once sync.Once
+var q chan struct{}
+
+func (m *Map) resolve(e Entry, src string, rootfs *string) {
+	once.Do(func() {
+		if Opt.ELF.NumGoroutine < 1 {
+			Opt.ELF.NumGoroutine = 1
+		}
+		q = make(chan struct{}, Opt.ELF.NumGoroutine)
+	})
+
+	mm := make(maskMap, len(m.mm))
+	copy(mm, m.mm)
+
+	m.wg.Add(1)
+	q <- struct{}{}
+	go func() {
+		r, err := elf.Resolve(src, rootfs, true, e.LibraryPath)
+		m.mu.Lock()
+		m.elf = append(m.elf, &result{
+			mm:     mm,
+			libs:   r,
+			e:      e,
+			rootfs: rootfs,
+			src:    src,
+			err:    err,
+		})
+		m.mu.Unlock()
+		m.wg.Done()
+		<-q
+	}()
+}
+
+type multiError []string
+
+func (e multiError) Error() string {
+	if len(e) == 1 {
+		return e[0]
+	}
+	return "\n  " + strings.Join(e, "\n  ")
+}
+
+func (m *Map) includeElfs() error {
+	m.wg.Wait()
+
+	var r multiError
+	mm := m.mm
+	for _, v := range m.elf {
+		m.mm = v.mm
+		if err := m.includeElf(v); err != nil {
+			r = append(r, lineError{v.e.Line, err}.Error())
+		}
+	}
+
+	m.mm = mm
+	if len(r) == 0 {
+		return nil
+	}
+	return r
+}
+
+func (m *Map) includeElf(r *result) error {
+	if r.err != nil {
+		switch r.err.(type) {
+		case *stdelf.FormatError:
+		default:
+			return r.err
+		}
+	}
+
+	if strings.TrimLeft(r.e.Src, "/") == r.e.Dst {
+		if r.rootfs != nil && r.e.Type != TypeLinkedAbs {
+			r.e.Dst = strings.TrimPrefix(r.src, *r.rootfs)
+		} else {
+			r.e.Dst = r.src
+		}
+		r.e.Dst = strings.TrimLeft(r.e.Dst, "/")
+	}
+
+	m.Add(Entry{
+		r.src,
+		r.e.Dst,
+		r.e.User,
+		r.e.Group,
+		0755,
+		TypeRegular,
+		"", 0, 0, nil, nil,
+	})
+
+	if r.err != nil {
+		if Opt.ELF.Fallback {
+			return nil
+		} else {
+			return r.err
+		}
+	}
+
+	for _, v := range r.libs {
+		if v == r.src {
+			continue
+		}
+
+		var err error
+		v, err = m.expand(v, r.rootfs)
+		if err != nil {
+			return err
+		}
+
+		dst := v
+		if r.rootfs != nil {
+			dst = strings.TrimPrefix(dst, *r.rootfs)
+		}
+		dst = strings.TrimPrefix(dst, "/")
+
+		m.Add(Entry{
+			v,
+			dst,
+			r.e.User,
+			r.e.Group,
+			0755,
+			TypeRegular,
+			"", 0, 0, nil, nil,
+		})
+	}
+
+	return nil
+}
+
 var elfAdded = make(map[string]struct{})
 
 func (m *Map) addElf(e Entry, rootfs *string) error {
@@ -427,88 +572,27 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		elfAdded[src] = struct{}{}
 	}
 
-	var (
-		r   []string
-		err error
-	)
-	if rootfs != nil {
-		r, err = elf.ResolveRoot(e.Src, *rootfs, e.Type == TypeLinkedAbs, e.LibraryPath)
-	} else {
-		r, err = elf.Resolve(e.Src, e.LibraryPath)
-	}
-
-	if err != nil && !Opt.ELF.Fallback {
-		return err
-	}
-
-	var osrc string
+	var err error
 	if Opt.ELF.Expand {
-		osrc = src
-		if nsrc, err := m.expand(src, rootfs); err != nil {
+		if src, err = m.expand(src, rootfs); err != nil {
 			return err
-		} else {
-			src = nsrc
 		}
 	}
 
-	if strings.TrimLeft(e.Src, "/") == e.Dst {
-		if rootfs != nil && e.Type != TypeLinkedAbs {
-			e.Dst = strings.TrimPrefix(src, *rootfs)
-		} else {
-			e.Dst = src
-		}
-		e.Dst = strings.TrimLeft(e.Dst, "/")
+	if Opt.ELF.Concurrent {
+		m.resolve(e, src, rootfs)
+		return nil
 	}
 
-	m.Add(Entry{
-		src,
-		e.Dst,
-		e.User,
-		e.Group,
-		0755,
-		TypeRegular,
-		"", 0, nil, nil,
+	r, err := elf.Resolve(src, rootfs, true, e.LibraryPath)
+	return m.includeElf(&result{
+		libs:   r,
+		e:      e,
+		rootfs: rootfs,
+		src:    src,
+		err:    err,
 	})
 
-	if err != nil && Opt.ELF.Fallback {
-		switch err.(type) {
-		case *stdelf.FormatError:
-			return nil
-		}
-		return err
-	}
-
-	for _, v := range r {
-		// '/usr/lib/lib.so'
-		switch v {
-		case src, osrc:
-			continue
-		}
-
-		var err error
-		v, err = m.expand(v, rootfs)
-		if err != nil {
-			return err
-		}
-
-		dst := v
-		if rootfs != nil {
-			dst = strings.TrimPrefix(dst, *rootfs)
-		}
-		dst = strings.TrimPrefix(dst, "/")
-
-		m.Add(Entry{
-			v,
-			dst,
-			e.User,
-			e.Group,
-			0755,
-			TypeRegular,
-			"", 0, nil, nil,
-		})
-	}
-
-	return nil
 }
 
 func (m *Map) Merge(t *Map) error {
@@ -580,7 +664,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			mode(info),
 			TypeDirectory,
-			"", 0, nil, nil,
+			"", 0, 0, nil, nil,
 		})
 		return nil
 	}
@@ -593,7 +677,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			mode(info),
 			TypeRegular,
-			"", 0, nil, nil,
+			"", 0, 0, nil, nil,
 		})
 		return nil
 	}
@@ -611,7 +695,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 			intPtr(m.gid, stat.Gid),
 			0777,
 			TypeSymlink,
-			"", 0, nil, nil,
+			"", 0, 0, nil, nil,
 		})
 		return nil
 	}
@@ -655,17 +739,26 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 	if err != nil {
 		return err
 	}
+
 	if Opt.Warn.EmptyGlob && len(r) < 1 {
 		log.Printf("emptyglob: %s", src)
 		return nil
 	}
+
 	for _, v := range r {
 		e.Src = trimPrefix(v, rootfs)
 		e.Dst = clean(e.Src)
+		e.Type = TypeRegular
+
+		if m.mm.apply(&e) {
+			continue
+		}
+
 		if err := m.addElf(e, rootfs); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

@@ -35,6 +35,7 @@ type Entry struct {
 	Type        string
 	Heredoc     string
 	Time        int64
+	Line        int
 	Data        []byte
 	LibraryPath []string
 }

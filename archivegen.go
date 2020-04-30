@@ -113,6 +113,8 @@ func main() {
 		Format: "tar",
 	}
 	buildflags(&opt, "")
+
+	config.Opt.ELF.NumGoroutine = runtime.NumCPU() * 2
 	buildflags(&config.Opt, "")
 
 	elf.Opt.LDGlob = "/etc/ld.so.conf"

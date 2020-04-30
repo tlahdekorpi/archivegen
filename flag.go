@@ -10,6 +10,8 @@ import (
 
 func set(name, desc string, v reflect.Value) {
 	switch x := v.Interface().(type) {
+	case *int:
+		flag.IntVar(x, name, *x, desc)
 	case *string:
 		flag.StringVar(x, name, *x, desc)
 	case *bool:
