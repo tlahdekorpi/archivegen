@@ -353,7 +353,7 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, re
 	}
 
 	var rd string
-	if c.root != nil {
+	if !c.abs && c.root != nil {
 		rd = path.Dir(strings.TrimPrefix(file, *c.root))
 	} else {
 		rd = path.Dir(file)
