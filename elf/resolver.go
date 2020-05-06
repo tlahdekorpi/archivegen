@@ -543,7 +543,7 @@ func resolve(file string, rootfs *string, abs, cache bool) ([]string, error) {
 
 	if len(ctx.err) > 0 {
 		return nil, errorNotFound(
-			strings.Join(ctx.err.list(), ", "),
+			file + ": " + strings.Join(ctx.err.list(), ", "),
 		)
 	}
 
