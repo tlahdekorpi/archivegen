@@ -103,9 +103,10 @@ type pe struct {
 }
 
 func (p pathset) set(s string, c elf.Class) {
-	v := p[s]
-	v.class = c
-	p[s] = v
+	if v, ok := p[s]; ok {
+		v.class = c
+		p[s] = v
+	}
 }
 
 func (p pathset) list() []pe {
