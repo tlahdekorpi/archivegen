@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -489,7 +490,7 @@ func (m *Map) includeElfs() error {
 }
 
 func (m *Map) includeElf(r *result) error {
-	if r.err != nil {
+	if r.err != nil && !errors.Is(r.err, io.EOF) {
 		switch r.err.(type) {
 		case *stdelf.FormatError:
 		default:
