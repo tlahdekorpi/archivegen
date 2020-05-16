@@ -786,7 +786,7 @@ func (m *Map) addPath(e Entry, rootfs *string) error {
 
 	for _, v := range Opt.Path {
 		file = path.Join(v, e.Src)
-		_, err = os.Stat(rootPrefix(file, rootfs))
+		_, err = os.Lstat(rootPrefix(file, rootfs))
 		if err == nil {
 			break
 		}
