@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/tlahdekorpi/archivegen/elf"
 )
 
 var (
@@ -197,9 +199,15 @@ func failable(e []string) (ok bool) {
 	return
 }
 
-func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
+type Config struct {
+	Resolver *elf.Resolver
+	Prefix   string
+	Vars     []string
+}
+
+func (c *Config) FromReader(r io.Reader) (*Map, error) {
 	s := bufio.NewScanner(r)
-	m := newMap(vars)
+	m := c.newMap()
 
 	var n int
 	for s.Scan() {
@@ -249,7 +257,7 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 		}
 
 		fail := failable(f)
-		if err := m.add(f, rootfs, fail, n); err != nil {
+		if err := m.add(f, &c.Prefix, fail, n); err != nil {
 			return nil, lineError{n, err}
 		}
 	}
@@ -267,19 +275,8 @@ func fromReader(rootfs *string, vars []string, r io.Reader) (*Map, error) {
 	return m, nil
 }
 
-func FromReader(vars []string, r io.Reader) (*Map, error) {
-	return fromReader(nil, vars, r)
-}
-
-func FromReaderRoot(rootfs string, vars []string, r io.Reader) (*Map, error) {
-	if rootfs != "" {
-		return fromReader(&rootfs, vars, r)
-	}
-	return fromReader(nil, vars, r)
-}
-
-func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
-	cfg := newMap(vars)
+func (c *Config) FromFiles(files ...string) (*Map, error) {
+	cfg := c.newMap()
 	for k, v := range files {
 		var (
 			f   io.ReadCloser
@@ -294,7 +291,7 @@ func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 			return nil, err
 		}
 
-		m, err := FromReaderRoot(*rootfs, vars, f)
+		m, err := c.FromReader(f)
 		if err != nil {
 			return nil, fmt.Errorf("%s (%d): %v", v, k, err)
 		}
@@ -309,12 +306,4 @@ func fromFiles(rootfs *string, vars []string, files ...string) (*Map, error) {
 	}
 
 	return cfg, nil
-}
-
-func FromFiles(vars []string, files ...string) (*Map, error) {
-	return fromFiles(nil, vars, files...)
-}
-
-func FromFilesRoot(rootfs string, vars []string, files ...string) (*Map, error) {
-	return fromFiles(&rootfs, vars, files...)
 }

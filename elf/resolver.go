@@ -10,10 +10,6 @@ import (
 	"sync"
 )
 
-var Opt struct {
-	LDGlob string `desc:"ld.conf glob"`
-}
-
 type errorNotFound string
 
 func (e errorNotFound) Error() string {
@@ -121,17 +117,11 @@ func (p pathset) list() []pe {
 	return r
 }
 
-func rootprefix(file string, rootfs *string, abs bool) string {
+func rootprefix(file string, rootfs string, abs bool) string {
 	if abs {
 		return file
 	}
-	if rootfs == nil {
-		return file
-	}
-	if *rootfs == "" {
-		return file
-	}
-	return path.Join(*rootfs, file)
+	return path.Join(rootfs, file)
 }
 
 type set map[string]struct{}
@@ -140,9 +130,7 @@ func (s set) add(key string) bool {
 	if _, exists := s[key]; exists {
 		return exists
 	}
-
 	s[key] = struct{}{}
-
 	return false
 }
 
@@ -160,15 +148,17 @@ func (s set) list() []string {
 }
 
 type fileset struct {
-	mu    sync.Mutex
-	dirs  set
-	files set
+	prefix string
+	mu     sync.Mutex
+	dirs   set
+	files  set
 }
 
-func newfileset() *fileset {
+func newfileset(prefix string) *fileset {
 	return &fileset{
-		dirs:  make(set),
-		files: make(set),
+		dirs:   make(set),
+		files:  make(set),
+		prefix: prefix,
 	}
 }
 
@@ -177,7 +167,7 @@ func (f *fileset) add(dir string) {
 		return
 	}
 
-	rdir, err := expand(dir)
+	rdir, err := expand(dir, f.prefix)
 	if err != nil && !os.IsNotExist(err) {
 		return
 	} else {
@@ -221,11 +211,11 @@ type context struct {
 	cache  *fileset
 	ldconf pathset
 	class  elf.Class
-	root   *string
-	abs    bool
+	root   string
+	loader Loader
 }
 
-func (c *context) search1(file string, ret set, from []pe) (string, elfFile, error) {
+func (c *context) search1(file string, ret set, from []pe) (string, ELF, error) {
 	var r string
 
 	for _, v := range from {
@@ -236,7 +226,7 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 		dir := v.path
 		if file[0] != '/' {
 			// relative path
-			dir = rootprefix(v.path, c.root, c.abs && v.origin)
+			dir = rootprefix(v.path, c.root, v.origin)
 			r = path.Join(dir, file)
 		} else {
 			// absolute path
@@ -262,7 +252,7 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 			}
 		}
 
-		f, err := open(r)
+		f, err := c.loader(r, c.root)
 		if os.IsNotExist(err) {
 			continue
 		}
@@ -274,25 +264,22 @@ func (c *context) search1(file string, ret set, from []pe) (string, elfFile, err
 			return "", nil, err
 		}
 
-		if e, ok := f.(*elf.File); ok {
-			if e.Class != c.class {
-				c.ldconf.set(v.path, e.Class)
-				if err := f.Close(); err != nil {
-					return "", nil, err
-				}
-				continue
-			}
+		if f.Class() == c.class {
+			return r, f, nil
 		}
 
-		return r, f, nil
+		c.ldconf.set(v.path, f.Class())
+		if err := f.Close(); err != nil {
+			return "", nil, err
+		}
 	}
 
 	return r, nil, errorNotFound(r)
 }
 
-func (c *context) search(file string, ret set, path ...[]pe) (string, elfFile, error) {
+func (c *context) search(file string, ret set, path ...[]pe) (string, ELF, error) {
 	var (
-		f   elfFile
+		f   ELF
 		r   string
 		err error
 	)
@@ -330,44 +317,22 @@ func mkpe(p []string) []pe {
 	return r
 }
 
-func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, ret set) error {
+func (c *context) resolv(file string, f ELF, rpath pathset, runpath []pe, ret set) error {
 	if ret.add(file) {
 		return nil
 	}
 
-	needed, err := f.DynString(elf.DT_NEEDED)
+	e, err := f.Dynamic()
 	if err != nil {
 		return err
 	}
+	needed := e.Needed
 
 	oldrunpath := runpath
-	var newrunpath []string
-	newrunpath, err = f.DynString(elf.DT_RUNPATH)
-	if err != nil {
-		return err
-	}
-	runpath = mkpe(split(newrunpath))
+	runpath = mkpe(split(e.Runpath))
 
-	rpathE, err := f.DynString(elf.DT_RPATH)
-	if err != nil {
-		return err
-	}
-
-	// opened in resolve/search
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	var rd string
-	if !c.abs && c.root != nil {
-		rd = path.Dir(strings.TrimPrefix(file, *c.root))
-	} else {
-		rd = path.Dir(file)
-	}
-	rpath = rpath.add(
-		rd,
-		split(rpathE)...,
-	)
+	rd := path.Dir(file)
+	rpath = rpath.add(rd, split(e.Rpath)...)
 
 	if len(runpath) > 0 {
 		x := tokenExpander(rd)
@@ -420,7 +385,7 @@ func (c *context) resolv(file string, f elfFile, rpath pathset, runpath []pe, re
 	return nil
 }
 
-func ldglob(glob string, rootfs *string, abs bool) ([]string, error) {
+func ldglob(glob string, rootfs string, abs bool) ([]string, error) {
 	var r []string
 
 	g, err := filepath.Glob(rootprefix(glob, rootfs, abs))
@@ -484,71 +449,78 @@ var defaultLibs = mkpe([]string{
 	"/usr/lib",
 })
 
-var (
-	mu           = new(sync.Mutex)
-	ctxcache     = newfileset()
-	resolvecache = make(map[string][]string)
+type File struct {
+	Runpath []string
+	Rpath   []string
+	Needed  []string
+}
 
-	ldconf       []string
-	defaultclass elf.Class
-)
+type ELF interface {
+	Interpreter() (string, error)
+	Dynamic() (File, error)
+	Class() elf.Class
+	Close() error
+}
 
-func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]string, error) {
-	file = rootprefix(file, rootfs, abs)
+type Loader func(file, prefix string) (ELF, error)
 
-	mu.Lock()
-	if r, ok := resolvecache[file]; ok {
-		mu.Unlock()
-		return r, nil
+type Resolver struct {
+	Loader Loader
+	prefix string
+	ldconf []string
+	cache  *fileset
+	mu     sync.Mutex
+	class  elf.Class
+}
+
+func NewResolver(prefix string) *Resolver {
+	return &Resolver{
+		cache:  newfileset(prefix),
+		prefix: prefix,
 	}
-	mu.Unlock()
+}
 
-	ctx := context{
-		err:   make(set),
-		abs:   abs,
-		root:  rootfs,
-		class: elf.ELFCLASS64,
-	}
-	if cache {
-		ctx.cache = ctxcache
-	}
+func (r *Resolver) ReadConfig(file string) error {
+	ld, err := ldglob(file, r.prefix, false)
+	r.ldconf = ld
+	return err
+}
 
-	mu.Lock()
-	if cache && ldconf == nil {
-		var err error
-		if ldconf, err = ldglob(Opt.LDGlob, rootfs, false); err != nil {
-			mu.Unlock()
-			return nil, err
-		}
+func (r *Resolver) Resolve(file string, ld ...string) ([]string, error) {
+	var loader Loader
+	if r.Loader != nil {
+		loader = r.Loader
+	} else {
+		loader = defaultLoader
 	}
 
-	if ld != nil {
-		ctx.ldconf = ctx.ldconf.add(path.Dir(file), ld...)
-	}
-	ctx.ldconf = ctx.ldconf.add(path.Dir(file), ldconf...)
-	mu.Unlock()
-
-	f, err := open(file)
+	f, err := loader(file, r.prefix)
 	if err != nil {
 		return nil, err
 	}
 
-	if e, ok := f.(*elf.File); ok {
-		ctx.class = e.Class
+	ctx := context{
+		err:    make(set),
+		class:  f.Class(),
+		root:   r.prefix,
+		cache:  r.cache,
+		loader: loader,
 	}
+	ctx.ldconf = ctx.ldconf.add(
+		path.Dir(file),
+		append(ld, r.ldconf...)...,
+	)
 
-	mu.Lock()
-	if defaultclass == elf.ELFCLASSNONE {
-		defaultclass = ctx.class
+	r.mu.Lock()
+	if r.class == elf.ELFCLASSNONE {
+		r.class = ctx.class
 	}
-	mu.Unlock()
+	r.mu.Unlock()
 
 	ret := make(set)
-	if i, err := readinterp(f); err == nil {
-		ret.add(rootprefix(i, rootfs, false))
-	} /* else {
-		log.Println("resolve:", err)
-	} */
+	if i, err := f.Interpreter(); err == nil {
+		ret.add(path.Join(r.prefix, i))
+	}
 
 	if err := ctx.resolv(
 		file,
@@ -566,16 +538,7 @@ func resolve(file string, rootfs *string, abs, cache bool, ld []string) ([]strin
 		)
 	}
 
-	list := ret.list()
-	mu.Lock()
-	resolvecache[file] = list
-	mu.Unlock()
-	return list, nil
-}
-
-// ResolveRoot searches libraries from rootfs. If abs, file will not prefixed with rootfs.
-func Resolve(file string, rootfs *string, abs bool, ld []string) ([]string, error) {
-	return resolve(file, rootfs, abs, true, ld)
+	return ret.list(), nil
 }
 
 func classmatch(file string, class elf.Class) bool {
@@ -584,43 +547,25 @@ func classmatch(file string, class elf.Class) bool {
 		return false
 	}
 	defer f.Close()
+	if class == elf.ELFCLASSNONE {
+		class = elf.ELFCLASS64
+	}
 	return class == f.Class
 }
 
-// Find searches files with matching class from ld.conf and default paths.
-func Find(file string, rootfs *string, class elf.Class) (string, error) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if defaultclass == elf.ELFCLASSNONE {
-		defaultclass = elf.ELFCLASS64
-	}
-
-	if class == elf.ELFCLASSNONE {
-		class = defaultclass
-	}
-
-	if ldconf == nil {
-		if r, err := ldglob(Opt.LDGlob, rootfs, false); err != nil {
-			return "", err
-		} else {
-			ldconf = r
-		}
-	}
-
-	for _, v := range ldconf {
-		p := path.Join(rootprefix(v, rootfs, false), file)
-		if classmatch(p, class) {
+func (r *Resolver) Find(file string) (string, error) {
+	for _, v := range r.ldconf {
+		p := path.Join(r.prefix, v, file)
+		if classmatch(p, r.class) {
 			return path.Join(v, file), nil
 		}
 	}
 
 	for _, v := range defaultLibs {
-		p := path.Join(rootprefix(v.path, rootfs, false), file)
-		if classmatch(p, class) {
+		p := path.Join(r.prefix, v.path, file)
+		if classmatch(p, r.class) {
 			return path.Join(v.path, file), nil
 		}
 	}
-
 	return "", errorNotFound(file)
 }

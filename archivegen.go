@@ -40,18 +40,18 @@ func open(file string) *os.File {
 	return r
 }
 
-func loadTree(rootfs string, vars, files []string, stdin bool) (*tree.Node, error) {
+func loadTree(c *config.Config, files []string, stdin bool) (*tree.Node, error) {
 	var m1, m2 *config.Map
 	var err error
 
 	if stdin {
-		m1, err = config.FromReaderRoot(rootfs, vars, os.Stdin)
+		m1, err = c.FromReader(os.Stdin)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("stdin: %v", err)
 	}
 
-	m2, err = config.FromFilesRoot(rootfs, vars, files...)
+	m2, err = c.FromFiles(files...)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,7 @@ type opts struct {
 	Stdout        bool   `desc:"Write archive to stdout"`
 	Timestamp     bool   `desc:"Preserve file timestamps"`
 	Version       bool   `desc:"Version information"`
+	Ldconf        string `desc:"Path to ld.so.conf" flag:"ld.so.conf"`
 }
 
 func main() {
@@ -111,14 +112,12 @@ func main() {
 
 	opt := opts{
 		Format: "tar",
+		Ldconf: "/etc/ld.so.conf",
 	}
 	buildflags(&opt, "")
 
 	config.Opt.ELF.NumGoroutine = runtime.NumCPU() * 2
 	buildflags(&config.Opt, "")
-
-	elf.Opt.LDGlob = "/etc/ld.so.conf"
-	buildflags(&elf.Opt, "elf.")
 
 	var varX varValue
 	flag.Var(&varX, "X", "Variable\n"+
@@ -130,6 +129,15 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	c := &config.Config{
+		Resolver: elf.NewResolver(opt.Rootfs),
+		Prefix:   opt.Rootfs,
+		Vars:     []string(varX),
+	}
+	if err := c.Resolver.ReadConfig(opt.Ldconf); err != nil {
+		log.Fatalln("ld.so.conf:", err)
+	}
 
 	if config.Opt.Path == nil {
 		config.Opt.Path = strings.Split(os.Getenv("PATH"), ":")
@@ -156,7 +164,7 @@ func main() {
 		log.Fatal("not enough arguments")
 	}
 
-	root, err := loadTree(opt.Rootfs, []string(varX), flag.Args(), !stdin && flag.NArg() == 0)
+	root, err := loadTree(c, flag.Args(), !stdin && flag.NArg() == 0)
 	if err != nil {
 		log.Fatal(err)
 	}

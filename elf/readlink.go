@@ -25,7 +25,7 @@ func comp(a, b string) int {
 	return len(a)
 }
 
-func readlink(s string, n int, c int) (string, error) {
+func readlink(s string, n int, c int, prefix string) (string, error) {
 	s = path.Clean(s)
 
 	ls := len(s)
@@ -60,7 +60,7 @@ func readlink(s string, n int, c int) (string, error) {
 
 	if f.Mode()&os.ModeSymlink == 0 {
 		if ls != ln {
-			return readlink(s, n, c)
+			return readlink(s, n, c, prefix)
 		}
 		return s, nil
 	}
@@ -79,7 +79,7 @@ func readlink(s string, n int, c int) (string, error) {
 
 	var np string
 	if r[0] == '/' {
-		np = r
+		np = path.Join(prefix, r)
 	} else {
 		np = path.Join(s[:p+1], r)
 	}
@@ -91,23 +91,28 @@ func readlink(s string, n int, c int) (string, error) {
 
 	if x := strings.IndexByte(r, '/'); x >= 0 {
 		if x != 0 {
-			return readlink(np, ln, c)
+			return readlink(np, ln, c, prefix)
 		}
-		return readlink(np, 1, c)
+		return readlink(np, len(prefix)+1, c, prefix)
 	}
-	return readlink(np, n, c)
+	return readlink(np, n, c, prefix)
 }
 
-func expand(p string) (string, error) {
-	if len(p) < 1 {
+func expand(p, prefix string) (string, error) {
+	if len(p) == 0 {
+		return p, nil
+	}
+
+	if !strings.HasPrefix(p, prefix) {
 		return p, nil
 	}
 
 	var i int
-
 	if p[0] == '/' {
 		i++
 	}
-
-	return readlink(p, i, 0)
+	if n := len(prefix); n > 0 {
+		i = n + 1
+	}
+	return readlink(p, i, 0, prefix)
 }

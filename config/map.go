@@ -153,17 +153,23 @@ type Map struct {
 	// variable map
 	v *variableMap
 
+	r *elf.Resolver
+
+	prefix string
+
 	wg  sync.WaitGroup
 	mu  sync.Mutex
 	elf []*result
 }
 
-func newMap(vars []string) *Map {
+func (c *Config) newMap() *Map {
 	return &Map{
-		m:  make(map[string]int),
-		mm: make(maskMap, 0),
-		A:  make([]Entry, 0),
-		v:  newVariableMap(vars),
+		m:      make(map[string]int),
+		mm:     make(maskMap, 0),
+		A:      make([]Entry, 0),
+		v:      newVariableMap(c.Vars),
+		prefix: c.Prefix,
+		r:      c.Resolver,
 	}
 }
 
@@ -428,16 +434,15 @@ func trimPrefix(file string, rootfs *string) string {
 	return strings.TrimPrefix(file, *rootfs)
 }
 
-var once sync.Once
 var q chan struct{}
 
 func (m *Map) resolve(e Entry, src string, rootfs *string) {
-	once.Do(func() {
+	if q == nil {
 		if Opt.ELF.NumGoroutine < 1 {
 			Opt.ELF.NumGoroutine = 1
 		}
 		q = make(chan struct{}, Opt.ELF.NumGoroutine)
-	})
+	}
 
 	mm := make(maskMap, len(m.mm))
 	copy(mm, m.mm)
@@ -445,7 +450,7 @@ func (m *Map) resolve(e Entry, src string, rootfs *string) {
 	m.wg.Add(1)
 	q <- struct{}{}
 	go func() {
-		r, err := elf.Resolve(src, rootfs, true, e.LibraryPath)
+		r, err := m.r.Resolve(src, e.LibraryPath...)
 		m.mu.Lock()
 		m.elf = append(m.elf, &result{
 			mm:     mm,
@@ -585,7 +590,7 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 		return nil
 	}
 
-	r, err := elf.Resolve(src, rootfs, true, e.LibraryPath)
+	r, err := m.r.Resolve(src, e.LibraryPath...)
 	return m.includeElf(&result{
 		libs:   r,
 		e:      e,
@@ -765,7 +770,7 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 
 func (m *Map) addElfLib(e Entry, rootfs *string) error {
 	var err error
-	e.Src, err = elf.Find(e.Src, rootfs, stdelf.ELFCLASSNONE)
+	e.Src, err = m.r.Find(e.Src)
 	if err != nil {
 		return err
 	}

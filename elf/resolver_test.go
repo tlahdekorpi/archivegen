@@ -2,51 +2,46 @@ package elf
 
 import (
 	"debug/elf"
-	"errors"
 	"sort"
 	"testing"
 )
 
 type ef [][]string
 
-func get(s [][]string, n int) []string {
-	var r []string
-	if len(s)-1 >= n {
-		r = s[n]
+func (e ef) get(n int) []string {
+	if len(e)-1 >= n {
+		return e[n]
 	}
-	return r
-}
-
-func (e ef) DynString(tag elf.DynTag) ([]string, error) {
-	switch tag {
-	case elf.DT_NEEDED:
-		return get(e, 0), nil
-	case elf.DT_RUNPATH:
-		return get(e, 1), nil
-	case elf.DT_RPATH:
-		return get(e, 2), nil
-	}
-	return nil, errors.New("no such tag: " + tag.String())
-}
-
-func (e ef) Close() error {
 	return nil
 }
 
-func mapOpen(d map[string]ef) func(f string) (elfFile, error) {
-	return func(f string) (elfFile, error) {
-		r, exists := d[f]
-		if !exists {
-			return nil, errorNotFound(f)
+func (e ef) Interpreter() (string, error) { return "", errNoInterp }
+
+func (e ef) Class() elf.Class { return 0 }
+
+func (e ef) Close() error { return nil }
+
+func (e ef) Dynamic() (File, error) {
+	return File{
+		Runpath: e.get(2),
+		Rpath:   e.get(1),
+		Needed:  e.get(0),
+	}, nil
+}
+
+func mapOpen(d map[string]ef) Loader {
+	return func(f, _ string) (ELF, error) {
+		if r, exists := d[f]; exists {
+			return r, nil
 		}
-		return r, nil
+		return nil, errorNotFound(f)
 	}
 }
 
 func testResolve(t *testing.T, f string, re []string, data map[string]ef) {
-	open = mapOpen(data)
+	resolver := &Resolver{Loader: mapOpen(data)}
 
-	r, err := resolve(f, nil, true, false, nil)
+	r, err := resolver.Resolve(f)
 	if err != nil {
 		t.Fatal(err)
 	}

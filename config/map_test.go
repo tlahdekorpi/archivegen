@@ -174,14 +174,16 @@ func equal(src, dst *Entry) bool {
 }
 
 func TestMapResolve(t *testing.T) {
-	vars := []string{"x", "global"}
+	c := &Config{
+		Vars: []string{"x", "global"},
+	}
 
 	var m1, m2 *Map
 	var err error
-	if m1, err = FromReader(vars, dataBuf1()); err != nil {
+	if m1, err = c.FromReader(dataBuf1()); err != nil {
 		t.Fatal(err)
 	}
-	if m2, err = FromReader(vars, dataBuf2()); err != nil {
+	if m2, err = c.FromReader(dataBuf2()); err != nil {
 		t.Fatal(err)
 	}
 
