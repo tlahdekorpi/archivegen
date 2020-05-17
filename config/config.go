@@ -257,7 +257,7 @@ func (c *Config) FromReader(r io.Reader) (*Map, error) {
 		}
 
 		fail := failable(f)
-		if err := m.add(f, &c.Prefix, fail, n); err != nil {
+		if err := m.add(f, fail, n); err != nil {
 			return nil, lineError{n, err}
 		}
 	}

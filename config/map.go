@@ -131,12 +131,11 @@ func (m *variableMap) add(e entry) error {
 }
 
 type result struct {
-	mm     maskMap
-	libs   []string
-	e      Entry
-	rootfs *string
-	src    string
-	err    error
+	mm   maskMap
+	libs []string
+	e    Entry
+	src  string
+	err  error
 }
 
 type Map struct {
@@ -150,9 +149,7 @@ type Map struct {
 	// lookup existance/index of entries.
 	m map[string]int
 
-	// variable map
 	v *variableMap
-
 	r *elf.Resolver
 
 	prefix string
@@ -218,13 +215,13 @@ func alternate(s string) []string {
 	return r
 }
 
-func lookup(rootfs *string, t string, files ...string) (file string, err error) {
+func lookup(prefix string, t string, files ...string) (file string, err error) {
 	switch t {
 	case TypeLinkedAbs, TypeGlob, TypeRecursive, TypeRegular:
-		rootfs = nil
+		prefix = ""
 	}
 	for _, file = range files {
-		_, err = os.Stat(rootPrefix(file, rootfs))
+		_, err = os.Stat(path.Join(prefix, file))
 		if err == nil {
 			break
 		}
@@ -232,7 +229,7 @@ func lookup(rootfs *string, t string, files ...string) (file string, err error) 
 	return
 }
 
-func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
+func (m *Map) add(e entry, fail bool, line int) error {
 	for k, _ := range e {
 		e[k] = m.v.r.Replace(e[k])
 	}
@@ -290,7 +287,7 @@ func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 
 			e[idx] = v
 
-			err := m.add(e, rootfs, fail, line)
+			err := m.add(e, fail, line)
 			if err != nil {
 				return err
 			}
@@ -305,21 +302,16 @@ func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 		return err
 	}
 
-	// entry rootfs takes priority
-	if r := e.Root(); r != nil {
-		rootfs = r
-	}
-
 	a := alternate(E.Src)
 	if a != nil {
-		E.Src, err = lookup(rootfs, e.Type(), a...)
+		E.Src, err = lookup(m.prefix, e.Type(), a...)
 		if !e.isSet(idxDst) {
 			E.Dst = clean(E.Src)
 		}
 	}
 	if fail {
 		if a == nil {
-			_, err = lookup(rootfs, e.Type(), E.Src)
+			_, err = lookup(m.prefix, e.Type(), E.Src)
 		}
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -341,23 +333,23 @@ func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 	case
 		TypeRecursiveRel,
 		TypeGlobRel:
-		E.Src = rootPrefix(E.Src, rootfs)
+		E.Src = path.Join(m.prefix, E.Src)
 	}
 
 	switch E.Type {
 	case
 		TypeLinkedGlob:
-		return m.addElfGlob(E, rootfs)
+		return m.addElfGlob(E)
 	case
 		TypeLibrary:
-		return m.addElfLib(E, rootfs)
+		return m.addElfLib(E)
 	case
 		TypeLinkedAbs,
 		TypeLinked:
-		return m.addElf(E, rootfs)
+		return m.addElf(E)
 	case
 		TypePath:
-		return m.addPath(E, rootfs)
+		return m.addPath(E)
 	case
 		TypeRecursiveRel,
 		TypeRecursive:
@@ -365,7 +357,6 @@ func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 			E,
 			e.isSet(idxUser),
 			e.isSet(idxGroup),
-			rootfs,
 		)
 	case
 		TypeGlob,
@@ -374,7 +365,6 @@ func (m *Map) add(e entry, rootfs *string, fail bool, line int) error {
 			E,
 			e.isSet(idxUser),
 			e.isSet(idxGroup),
-			rootfs,
 		)
 	}
 
@@ -414,29 +404,9 @@ func rlog(e1, e2 Entry) {
 	log.Printf("replace: %s -> %s", e1.Src, e2.Src)
 }
 
-func rootPrefix(file string, rootfs *string) string {
-	if rootfs == nil {
-		return file
-	}
-	if *rootfs == "" {
-		return file
-	}
-	return path.Join(*rootfs, file)
-}
-
-func trimPrefix(file string, rootfs *string) string {
-	if rootfs == nil {
-		return file
-	}
-	if *rootfs == "" {
-		return file
-	}
-	return strings.TrimPrefix(file, *rootfs)
-}
-
 var q chan struct{}
 
-func (m *Map) resolve(e Entry, src string, rootfs *string) {
+func (m *Map) resolve(e Entry, src string) {
 	if q == nil {
 		if Opt.ELF.NumGoroutine < 1 {
 			Opt.ELF.NumGoroutine = 1
@@ -453,12 +423,11 @@ func (m *Map) resolve(e Entry, src string, rootfs *string) {
 		r, err := m.r.Resolve(src, e.LibraryPath...)
 		m.mu.Lock()
 		m.elf = append(m.elf, &result{
-			mm:     mm,
-			libs:   r,
-			e:      e,
-			rootfs: rootfs,
-			src:    src,
-			err:    err,
+			mm:   mm,
+			libs: r,
+			e:    e,
+			src:  src,
+			err:  err,
 		})
 		m.mu.Unlock()
 		m.wg.Done()
@@ -504,8 +473,8 @@ func (m *Map) includeElf(r *result) error {
 	}
 
 	if strings.TrimLeft(r.e.Src, "/") == r.e.Dst {
-		if r.rootfs != nil && r.e.Type != TypeLinkedAbs {
-			r.e.Dst = strings.TrimPrefix(r.src, *r.rootfs)
+		if r.e.Type != TypeLinkedAbs {
+			r.e.Dst = strings.TrimPrefix(r.src, m.prefix)
 		} else {
 			r.e.Dst = r.src
 		}
@@ -536,15 +505,13 @@ func (m *Map) includeElf(r *result) error {
 		}
 
 		var err error
-		v, err = m.expand(v, r.rootfs)
+		v, err = m.expand(v)
 		if err != nil {
 			return err
 		}
 
 		dst := v
-		if r.rootfs != nil {
-			dst = strings.TrimPrefix(dst, *r.rootfs)
-		}
+		dst = strings.TrimPrefix(dst, m.prefix)
 		dst = strings.TrimPrefix(dst, "/")
 
 		m.Add(Entry{
@@ -563,10 +530,10 @@ func (m *Map) includeElf(r *result) error {
 
 var elfAdded = make(map[string]struct{})
 
-func (m *Map) addElf(e Entry, rootfs *string) error {
+func (m *Map) addElf(e Entry) error {
 	var src string
 	if e.Type != TypeLinkedAbs {
-		src = rootPrefix(e.Src, rootfs)
+		src = path.Join(m.prefix, e.Src)
 	} else {
 		src = e.Src
 	}
@@ -580,23 +547,22 @@ func (m *Map) addElf(e Entry, rootfs *string) error {
 
 	var err error
 	if Opt.ELF.Expand {
-		if src, err = m.expand(src, rootfs); err != nil {
+		if src, err = m.expand(src); err != nil {
 			return err
 		}
 	}
 
 	if Opt.ELF.Concurrent {
-		m.resolve(e, src, rootfs)
+		m.resolve(e, src)
 		return nil
 	}
 
 	r, err := m.r.Resolve(src, e.LibraryPath...)
 	return m.includeElf(&result{
-		libs:   r,
-		e:      e,
-		rootfs: rootfs,
-		src:    src,
-		err:    err,
+		libs: r,
+		e:    e,
+		src:  src,
+		err:  err,
 	})
 
 }
@@ -608,7 +574,7 @@ func (m *Map) Merge(t *Map) error {
 	return nil
 }
 
-func (m *Map) addRecursive(e Entry, user, group bool, rootfs *string) error {
+func (m *Map) addRecursive(e Entry, user, group bool) error {
 	var uid, gid *int
 	if user {
 		uid = &e.User
@@ -616,7 +582,7 @@ func (m *Map) addRecursive(e Entry, user, group bool, rootfs *string) error {
 	if group {
 		gid = &e.Group
 	}
-	return filepath.Walk(e.Src, mapW{m, e, uid, gid, rootfs}.walkFunc)
+	return filepath.Walk(e.Src, mapW{m, e, uid, gid, m.prefix}.walkFunc)
 }
 
 type mapW struct {
@@ -624,7 +590,7 @@ type mapW struct {
 	e      Entry
 	uid    *int
 	gid    *int
-	rootfs *string
+	prefix string
 }
 
 func intPtr(i *int, d uint32) int {
@@ -652,9 +618,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 		rf = path.Clean(af)
 	}
 
-	if m.rootfs != nil {
-		rf = strings.TrimPrefix(rf, *m.rootfs)
-	}
+	rf = strings.TrimPrefix(rf, m.prefix)
 	rf = strings.TrimPrefix(rf, "/")
 
 	stat, ok := info.Sys().(*syscall.Stat_t)
@@ -709,7 +673,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 	return fmt.Errorf("config: recursive: unknown file: %s", file)
 }
 
-func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
+func (m *Map) addGlob(e Entry, user, group bool) error {
 	r, err := filepath.Glob(e.Src)
 	if err != nil {
 		return err
@@ -719,7 +683,7 @@ func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
 		return nil
 	}
 
-	x := mapW{m: m, e: e, rootfs: rootfs}
+	x := mapW{m: m, e: e, prefix: m.prefix}
 	if user {
 		x.uid = &e.User
 	}
@@ -739,8 +703,8 @@ func (m *Map) addGlob(e Entry, user, group bool, rootfs *string) error {
 	return nil
 }
 
-func (m *Map) addElfGlob(e Entry, rootfs *string) error {
-	src := rootPrefix(e.Src, rootfs)
+func (m *Map) addElfGlob(e Entry) error {
+	src := path.Join(m.prefix, e.Src)
 	r, err := filepath.Glob(src)
 	if err != nil {
 		return err
@@ -752,7 +716,7 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 	}
 
 	for _, v := range r {
-		e.Src = trimPrefix(v, rootfs)
+		e.Src = strings.TrimPrefix(v, m.prefix)
 		e.Dst = clean(e.Src)
 		e.Type = TypeRegular
 
@@ -760,7 +724,7 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 			continue
 		}
 
-		if err := m.addElf(e, rootfs); err != nil {
+		if err := m.addElf(e); err != nil {
 			return err
 		}
 	}
@@ -768,7 +732,7 @@ func (m *Map) addElfGlob(e Entry, rootfs *string) error {
 	return nil
 }
 
-func (m *Map) addElfLib(e Entry, rootfs *string) error {
+func (m *Map) addElfLib(e Entry) error {
 	var err error
 	e.Src, err = m.r.Find(e.Src)
 	if err != nil {
@@ -776,22 +740,22 @@ func (m *Map) addElfLib(e Entry, rootfs *string) error {
 	}
 
 	e.Dst = clean(e.Src)
-	return m.addElf(e, rootfs)
+	return m.addElf(e)
 }
 
-func (m *Map) addPath(e Entry, rootfs *string) error {
+func (m *Map) addPath(e Entry) error {
 	var (
 		file string
 		err  error
 	)
 
 	if e.Src[0] == '/' {
-		return m.addElf(e, rootfs)
+		return m.addElf(e)
 	}
 
 	for _, v := range Opt.Path {
 		file = path.Join(v, e.Src)
-		_, err = os.Lstat(rootPrefix(file, rootfs))
+		_, err = os.Lstat(path.Join(m.prefix, file))
 		if err == nil {
 			break
 		}
@@ -805,5 +769,5 @@ func (m *Map) addPath(e Entry, rootfs *string) error {
 	}
 
 	e.Src = file
-	return m.addElf(e, rootfs)
+	return m.addElf(e)
 }

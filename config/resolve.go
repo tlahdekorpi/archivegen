@@ -23,7 +23,7 @@ func comp(a, b string) int {
 	return len(a)
 }
 
-func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
+func (m *Map) readlink(s string, n int, c int) (string, error) {
 	s = path.Clean(s)
 
 	ls := len(s)
@@ -58,7 +58,7 @@ func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
 
 	if f.Mode()&os.ModeSymlink == 0 {
 		if ls != ln {
-			return m.readlink(s, n, c, rootfs)
+			return m.readlink(s, n, c)
 		}
 		return s, nil
 	}
@@ -77,11 +77,7 @@ func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
 
 	var np string
 	if r[0] == '/' {
-		if rootfs != nil {
-			np = path.Join(*rootfs, r)
-		} else {
-			np = r
-		}
+		np = path.Join(m.prefix, r)
 	} else {
 		np = path.Join(s[:p+1], r)
 	}
@@ -91,10 +87,7 @@ func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
 		ln = comp(lx, np)
 	}
 
-	if rootfs != nil {
-		lx = strings.TrimPrefix(lx, *rootfs)
-	}
-
+	lx = strings.TrimPrefix(lx, m.prefix)
 	if lx[0] == '/' {
 		lx = lx[1:]
 	}
@@ -111,34 +104,28 @@ func (m *Map) readlink(s string, n int, c int, rootfs *string) (string, error) {
 
 	if x := strings.IndexByte(r, '/'); x >= 0 {
 		if x != 0 {
-			return m.readlink(np, ln, c, rootfs)
+			return m.readlink(np, ln, c)
 		}
-		if rootfs != nil {
-			return m.readlink(np, len(*rootfs)+1, c, rootfs)
-		}
-		return m.readlink(np, 1, c, rootfs)
+		return m.readlink(np, len(m.prefix)+1, c)
 	}
-	return m.readlink(np, n, c, rootfs)
+	return m.readlink(np, n, c)
 }
 
-func (m *Map) expand(p string, rootfs *string) (string, error) {
-	if len(p) < 1 {
+func (m *Map) expand(p string) (string, error) {
+	if len(p) == 0 {
 		return p, nil
 	}
 
-	if rootfs != nil && !strings.HasPrefix(p, *rootfs) {
+	if !strings.HasPrefix(p, m.prefix) {
 		return p, nil
 	}
 
 	var i int
-
 	if p[0] == '/' {
 		i++
 	}
-
-	if rootfs != nil {
-		i = len(*rootfs) + 1
+	if n := len(m.prefix); n > 0 {
+		i = n + 1
 	}
-
-	return m.readlink(p, i, 0, rootfs)
+	return m.readlink(p, i, 0)
 }

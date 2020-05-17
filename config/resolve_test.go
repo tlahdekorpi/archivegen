@@ -151,14 +151,14 @@ func TestExpand(t *testing.T) {
 		}
 
 		if v.v == "infinity" {
-			_, err := m.expand(p, nil)
+			_, err := m.expand(p)
 			if err != errTooManyLinks {
 				t.Fatal(err)
 			}
 			continue
 		}
 
-		x, err := m.expand(p, nil)
+		x, err := m.expand(p)
 		if err != nil {
 			t.Errorf("expand(%q): error: %v %q", v.k, err, x)
 			continue
@@ -169,7 +169,7 @@ func TestExpand(t *testing.T) {
 		}
 
 		dir.with(t, p, func() {
-			p, err := m.expand(".", nil)
+			p, err := m.expand(".")
 			if err != nil {
 				t.Errorf(`expand("."): error: %q %v`, v.k, err)
 			}
@@ -186,7 +186,7 @@ func TestExpand(t *testing.T) {
 				D = v.v
 			}
 
-			if p, err := m.expand(P, nil); err != nil {
+			if p, err := m.expand(P); err != nil {
 				t.Errorf("expand(%q): error: %v", v.k, err)
 			} else if path.Clean(p) != path.Clean(D) {
 				t.Errorf("expand(%q): %q != %q", P, p, D)
@@ -194,7 +194,7 @@ func TestExpand(t *testing.T) {
 		})
 
 		dir.with(t, tmp, func() {
-			if p, err := m.expand(v.k, nil); err != nil {
+			if p, err := m.expand(v.k); err != nil {
 				t.Errorf("expand(%q): error: %v", v.k, err)
 			} else if path.Clean(p) != path.Clean(v.v) {
 				t.Errorf("expand(%q): %q != %q", v.k, p, v.v)
