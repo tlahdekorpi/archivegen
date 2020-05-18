@@ -86,7 +86,11 @@ func (m maskMap) del(e entry) (maskMap, error) {
 			return m, nil
 		}
 		i = -i
-		return m[:len(m)-i], nil
+		if n := len(m) - i; n < 0 {
+			return nil, errIndexOOB
+		} else {
+			return m[:n], nil
+		}
 	}
 
 	if i >= len(m) {
