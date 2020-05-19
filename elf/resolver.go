@@ -477,6 +477,7 @@ func NewResolver(prefix string) *Resolver {
 	return &Resolver{
 		cache:  newfileset(prefix),
 		prefix: prefix,
+		Loader: defaultLoader,
 	}
 }
 
@@ -487,14 +488,7 @@ func (r *Resolver) ReadConfig(file string) error {
 }
 
 func (r *Resolver) Resolve(file string, ld ...string) ([]string, error) {
-	var loader Loader
-	if r.Loader != nil {
-		loader = r.Loader
-	} else {
-		loader = defaultLoader
-	}
-
-	f, err := loader(file, r.prefix)
+	f, err := r.Loader(file, r.prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +498,7 @@ func (r *Resolver) Resolve(file string, ld ...string) ([]string, error) {
 		class:  f.Class(),
 		root:   r.prefix,
 		cache:  r.cache,
-		loader: loader,
+		loader: r.Loader,
 	}
 	ctx.ldconf = ctx.ldconf.add(
 		path.Dir(file),
@@ -541,29 +535,30 @@ func (r *Resolver) Resolve(file string, ld ...string) ([]string, error) {
 	return ret.list(), nil
 }
 
-func classmatch(file string, class elf.Class) bool {
-	f, err := elf.Open(file)
+func (r *Resolver) classmatch(file string, class elf.Class) bool {
+	f, err := r.Loader(file, r.prefix)
 	if err != nil {
 		return false
 	}
 	defer f.Close()
+
 	if class == elf.ELFCLASSNONE {
 		class = elf.ELFCLASS64
 	}
-	return class == f.Class
+	return class == f.Class()
 }
 
 func (r *Resolver) Find(file string) (string, error) {
 	for _, v := range r.ldconf {
 		p := path.Join(r.prefix, v, file)
-		if classmatch(p, r.class) {
+		if r.classmatch(p, r.class) {
 			return path.Join(v, file), nil
 		}
 	}
 
 	for _, v := range defaultLibs {
 		p := path.Join(r.prefix, v.path, file)
-		if classmatch(p, r.class) {
+		if r.classmatch(p, r.class) {
 			return path.Join(v.path, file), nil
 		}
 	}
