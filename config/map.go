@@ -482,13 +482,12 @@ func (m *Map) includeElf(r *result) error {
 	}
 
 	m.Add(Entry{
-		r.src,
-		r.e.Dst,
-		r.e.User,
-		r.e.Group,
-		0755,
-		TypeRegular,
-		"", 0, 0, nil, nil,
+		Src:   r.src,
+		Dst:   r.e.Dst,
+		User:  r.e.User,
+		Group: r.e.Group,
+		Mode:  0755,
+		Type:  TypeRegular,
 	})
 
 	if r.err != nil {
@@ -515,13 +514,12 @@ func (m *Map) includeElf(r *result) error {
 		dst = strings.TrimPrefix(dst, "/")
 
 		m.Add(Entry{
-			v,
-			dst,
-			r.e.User,
-			r.e.Group,
-			0755,
-			TypeRegular,
-			"", 0, 0, nil, nil,
+			Src:   v,
+			Dst:   dst,
+			User:  r.e.User,
+			Group: r.e.Group,
+			Mode:  0755,
+			Type:  TypeRegular,
 		})
 	}
 
@@ -628,26 +626,24 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 
 	if info.IsDir() {
 		m.m.Add(Entry{
-			rf,
-			rf,
-			intPtr(m.uid, stat.Uid),
-			intPtr(m.gid, stat.Gid),
-			mode(info),
-			TypeDirectory,
-			"", 0, 0, nil, nil,
+			Src:   rf,
+			Dst:   rf,
+			User:  intPtr(m.uid, stat.Uid),
+			Group: intPtr(m.gid, stat.Gid),
+			Mode:  mode(info),
+			Type:  TypeDirectory,
 		})
 		return nil
 	}
 
 	if info.Mode().IsRegular() {
 		m.m.Add(Entry{
-			file,
-			rf,
-			intPtr(m.uid, stat.Uid),
-			intPtr(m.gid, stat.Gid),
-			mode(info),
-			TypeRegular,
-			"", 0, 0, nil, nil,
+			Src:   file,
+			Dst:   rf,
+			User:  intPtr(m.uid, stat.Uid),
+			Group: intPtr(m.gid, stat.Gid),
+			Mode:  mode(info),
+			Type:  TypeRegular,
 		})
 		return nil
 	}
@@ -659,13 +655,12 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 		}
 
 		m.m.Add(Entry{
-			f,
-			rf,
-			intPtr(m.uid, stat.Uid),
-			intPtr(m.gid, stat.Gid),
-			0777,
-			TypeSymlink,
-			"", 0, 0, nil, nil,
+			Src:   f,
+			Dst:   rf,
+			User:  intPtr(m.uid, stat.Uid),
+			Group: intPtr(m.gid, stat.Gid),
+			Mode:  0777,
+			Type:  TypeSymlink,
 		})
 		return nil
 	}
