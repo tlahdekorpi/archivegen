@@ -79,6 +79,9 @@ func hdrconv(a *archive.Header, t bool) *cpio.Header {
 }
 
 func (w *writer) WriteHeader(hdr *archive.Header) error {
+	if hdr.Type == archive.TypeDir {
+		hdr.Name += "/"
+	}
 	return w.cw.WriteHeader(hdrconv(hdr, w.t))
 }
 

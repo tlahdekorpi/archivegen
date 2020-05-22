@@ -1,0 +1,9 @@
+#!/bin/awk -f
+# archivegen -b64 -print | archive2mtree \
+#    | bsdtar -cf - @- | bsdtar -cf - --format=newc @-
+BEGIN {
+	print "#mtree"
+}
+/^d/ { print $2"/", "type=dir",  "mode="$3, "uid="$4, "gid="$5 };
+/^l/ { print $3,    "type=link", "mode="$4, "uid="$5, "gid="$6, "link="$2 };
+/^f/ { print $3,    "type=file", "mode="$4, "uid="$5, "gid="$6, "content="$2, "time=0" };

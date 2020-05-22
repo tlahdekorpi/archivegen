@@ -32,7 +32,7 @@ const (
 	// base16
 	digits = "0123456789abcdef"
 
-	zsize = 512
+	zsize = 10240
 )
 
 var zeroBlock [zsize]byte
@@ -47,6 +47,7 @@ type Header struct {
 	Devminor int    // minor number of character or block device.
 	Type     int    // filetype.
 	Name     string // name of header file entry.
+	nlinks   int64
 }
 
 func (hdr *Header) filemode() int {
@@ -61,7 +62,7 @@ type Writer struct {
 }
 
 func NewWriter(w io.Writer) *Writer {
-	return &Writer{w: w}
+	return &Writer{w: w, inode: 1}
 }
 
 func fmt16(n int64) []byte {
@@ -88,26 +89,20 @@ func newcHeader(u ...int64) []byte {
 }
 
 func (cw *Writer) header(hdr *Header) []byte {
-	var nlinks int = 1
-
-	if hdr.Type == TypeDir {
-		nlinks = 2
-	}
-
 	ret := newcHeader(
 		cw.inode,
 		int64(hdr.filemode()),
 		int64(hdr.Uid),
 		int64(hdr.Gid),
-		int64(nlinks),
+		hdr.nlinks,
 		hdr.Mtime,
 		hdr.Size,               // filesize
-		3,                      // devmajor
-		1,                      // devminor
+		0,                      // devmajor
+		hdr.nlinks^1,           // devminor
 		int64(hdr.Devmajor),    // rdevmajor
 		int64(hdr.Devminor),    // rdevminor
 		int64(len(hdr.Name))+1, // namesize + zero
-		0, // check, 0 in newc
+		0,                      // check, 0 in newc
 	)
 
 	// name + zero
@@ -205,11 +200,12 @@ func (cw *Writer) Write(b []byte) (int, error) {
 }
 
 func (cw *Writer) Close() error {
+	cw.inode = 0
 	err := cw.WriteHeader(
-		&Header{Name: "TRAILER!!!"},
+		&Header{Name: "TRAILER!!!", nlinks: 1},
 	)
 	if err != nil {
 		return err
 	}
-	return cw.pad(512)
+	return cw.pad(zsize)
 }
