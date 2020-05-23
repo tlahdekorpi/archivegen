@@ -47,7 +47,6 @@ type Header struct {
 	Devminor int    // minor number of character or block device.
 	Type     int    // filetype.
 	Name     string // name of header file entry.
-	nlinks   int64
 }
 
 func (hdr *Header) filemode() int {
@@ -94,11 +93,11 @@ func (cw *Writer) header(hdr *Header) []byte {
 		int64(hdr.filemode()),
 		int64(hdr.Uid),
 		int64(hdr.Gid),
-		hdr.nlinks,
+		0,
 		hdr.Mtime,
 		hdr.Size,               // filesize
 		0,                      // devmajor
-		hdr.nlinks^1,           // devminor
+		1,                      // devminor
 		int64(hdr.Devmajor),    // rdevmajor
 		int64(hdr.Devminor),    // rdevminor
 		int64(len(hdr.Name))+1, // namesize + zero
@@ -199,13 +198,24 @@ func (cw *Writer) Write(b []byte) (int, error) {
 	return n, err
 }
 
+var trailer []byte = append(
+	newcHeader(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 11, 0),
+	"TRAILER!!!"...,
+)
+
 func (cw *Writer) Close() error {
-	cw.inode = 0
-	err := cw.WriteHeader(
-		&Header{Name: "TRAILER!!!", nlinks: 1},
-	)
+	// flush remaining file
+	if err := cw.flush(); err != nil {
+		return err
+	}
+
+	n, err := cw.write(trailer)
 	if err != nil {
 		return err
 	}
+	if int(n) != len(trailer) {
+		return errPartialWrite
+	}
+
 	return cw.pad(zsize)
 }
