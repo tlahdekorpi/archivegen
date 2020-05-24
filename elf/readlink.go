@@ -98,7 +98,7 @@ func readlink(s string, n int, c int, prefix string) (string, error) {
 	return readlink(np, n, c, prefix)
 }
 
-func expand(p, prefix string) (string, error) {
+func Expand(p, prefix string) (string, error) {
 	if len(p) == 0 {
 		return p, nil
 	}

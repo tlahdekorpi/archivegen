@@ -167,7 +167,7 @@ func (f *fileset) add(dir string) {
 		return
 	}
 
-	rdir, err := expand(dir, f.prefix)
+	rdir, err := Expand(dir, f.prefix)
 	if err != nil && !os.IsNotExist(err) {
 		return
 	} else {

@@ -98,7 +98,7 @@ func defaultLoader(file, prefix string) (ELF, error) {
 
 	var err error
 	if prefix != "" {
-		if file, err = expand(file, prefix); err != nil {
+		if file, err = Expand(file, prefix); err != nil {
 			return nil, err
 		}
 	}
