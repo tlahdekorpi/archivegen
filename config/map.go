@@ -224,7 +224,9 @@ func lookup(prefix string, t string, files ...string) (file string, err error) {
 		prefix = ""
 	}
 	for _, file = range files {
-		_, err = os.Stat(path.Join(prefix, file))
+		file, err = elf.Expand(path.Join(prefix, file), prefix)
+		// TODO: use the absolute path as source and do not trim here.
+		file = strings.TrimPrefix(file, prefix)
 		if err == nil {
 			break
 		}
@@ -314,7 +316,7 @@ func (m *Map) add(e entry, fail bool, line int) error {
 	}
 	if fail {
 		if a == nil {
-			_, err = lookup(m.prefix, e.Type(), E.Src)
+			E.Src, err = lookup(m.prefix, e.Type(), E.Src)
 		}
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
