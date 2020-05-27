@@ -66,13 +66,13 @@ R a/b/c foo
 # a/b/c/file -> foo/file
 ```
 
-**`g, gr`** Glob
+**`r, rr`** Regex
 ```sh
-# g *src dst uid gid
+# r *src dst uid gid
 # all matches are prefixed with dst
-g /a/*/c dst
+r /a/.*/c dst
 # /a/b/c -> dst/a/b/c
-g /a/*/c -
+r /a/.*/c -
 # /a/b/c -> a/b/c
 ```
 
@@ -91,7 +91,7 @@ $variable
 !
 ```
 
-**`L, LA, gL, i`** ELF
+**`L, LA, rL, i`** ELF
 ```sh
 # L *src dst mode uid gid
 # src and all dependencies are read from rootfs
@@ -99,9 +99,9 @@ $variable
 L /usr/bin/bash
 # using LA, src and dependencies from rpath/runpath containing $ORIGIN are not prefixed with rootfs
 
-# gL *src - - uid gid
+# rL *src - - uid gid
 # dst and mode are ignored
-gL /usr/lib/httpd/modules/*.so
+rL /usr/lib/httpd/modules/.so$
 
 # search library paths
 i libnss_files.so.2

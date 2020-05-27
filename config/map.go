@@ -53,13 +53,13 @@ const (
 	TypeRecursiveRel = "Rr"
 	TypeRegular      = "f"
 	TypeRegularRel   = "fr"
-	TypeGlob         = "g"
-	TypeGlobRel      = "gr"
+	TypeGlob         = "r"
+	TypeGlobRel      = "rr"
 	TypeSymlink      = "l"
 	TypeCreate       = "c"
 	TypeCreateNoEndl = "cl"
 	TypeLinked       = "L"
-	TypeLinkedGlob   = "gL"
+	TypeLinkedGlob   = "rL"
 	TypeLinkedAbs    = "LA"
 	TypeLibrary      = "i"
 	TypePath         = "p"
@@ -173,9 +173,14 @@ func (c *Config) newMap() *Map {
 	}
 }
 
-func multi(s string) []string {
+func multi(s string, escape bool) []string {
 	i := strings.IndexByte(s, '{')
 	if i < 0 {
+		return []string{s}
+	}
+
+	// TODO: a better solution for regex and multi overlap
+	if escape && i > 0 && s[i-1] != '\\' {
 		return []string{s}
 	}
 
@@ -185,6 +190,9 @@ func multi(s string) []string {
 	}
 
 	a, b := s[:i], s[e+i+1:]
+	if escape {
+		a = a[:len(a)-1]
+	}
 
 	var r []string
 	for _, v := range strings.Split(s[i+1:i+e], ",") {
@@ -258,7 +266,14 @@ func (m *Map) add(e entry, fail bool, line int) error {
 	}
 
 	idx := idxSrc
-	mu := multi(e[idx])
+
+	var mu []string
+	switch e.Type() {
+	case TypeGlob, TypeGlobRel, TypeLinkedGlob:
+		mu = multi(e[idx], true)
+	default:
+		mu = multi(e[idx], false)
+	}
 
 	var dst string
 	if len(e) > idxDst && e[idxDst] != TypeOmit {
@@ -274,7 +289,7 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		case TypeSymlink:
 			if len(mu) == 1 {
 				idx = idxDst
-				mu = multi(e[idx])
+				mu = multi(e[idx], false)
 				break
 			}
 			fallthrough
@@ -307,7 +322,13 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		return err
 	}
 
-	a := alternate(E.Src)
+	var a []string
+	switch e.Type() {
+	case TypeGlob, TypeGlobRel, TypeLinkedGlob:
+	default:
+		a = alternate(E.Src)
+	}
+
 	if a != nil {
 		E.Src, err = lookup(m.prefix, e.Type(), a...)
 		if !e.isSet(idxDst) {
@@ -674,7 +695,7 @@ func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
 }
 
 func (m *Map) addGlob(e Entry, user, group bool) error {
-	r, err := filepath.Glob(e.Src)
+	r, err := m.match(e.Src)
 	if err != nil {
 		return err
 	}
@@ -711,7 +732,7 @@ func (m *Map) addGlob(e Entry, user, group bool) error {
 
 func (m *Map) addElfGlob(e Entry) error {
 	src := path.Join(m.prefix, e.Src)
-	r, err := filepath.Glob(src)
+	r, err := m.match(src)
 	if err != nil {
 		return err
 	}
@@ -724,11 +745,6 @@ func (m *Map) addElfGlob(e Entry) error {
 	for _, v := range r {
 		e.Src = strings.TrimPrefix(v, m.prefix)
 		e.Dst = clean(e.Src)
-		e.Type = TypeRegular
-
-		if m.mm.apply(&e) {
-			continue
-		}
 
 		if err := m.addElf(e); err != nil {
 			return err

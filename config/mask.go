@@ -295,7 +295,7 @@ func regexLibraryMask(e entry) (maskFunc, error) {
 		return nil, err
 	}
 
-	l := multi(e[idxMaskMode])
+	l := multi(e[idxMaskMode], false)
 
 	return func(E *Entry) bool {
 		if !r.MatchString(E.Dst) {
