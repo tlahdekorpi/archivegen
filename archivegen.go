@@ -116,6 +116,14 @@ func main() {
 	}
 	buildflags(&opt, "")
 
+	// Resolving all symlinks is required when symlinks inside the prefix
+	// lead to outside of the prefix.
+	config.Opt.Glob.Expand = true
+
+	// ELFs depending on libraries from rpath/runpath $ORIGIN will
+	// fail to resolve since the symlink is used as $ORIGIN.
+	config.Opt.ELF.Expand = true
+
 	config.Opt.ELF.NumGoroutine = runtime.NumCPU() * 2
 	buildflags(&config.Opt, "")
 
