@@ -40,6 +40,9 @@ var Opt struct {
 		Concurrent   bool `desc:"Load ELFs concurrently, results are added to the end of the archive"`
 		NumGoroutine int  `desc:"Number of goroutines resolving ELFs"`
 	}
+	Glob struct {
+		Expand bool `desc:"Resolve all symlinks for globs"`
+	}
 	Path PathVar `desc:"Search path"`
 }
 
@@ -689,6 +692,12 @@ func (m *Map) addGlob(e Entry, user, group bool) error {
 	x.e.Src = ""
 
 	for _, v := range r {
+		if Opt.Glob.Expand {
+			v, err = m.expand(v)
+			if err != nil {
+				return err
+			}
+		}
 		s, err := os.Lstat(v)
 		if err := x.walkFunc(v, s, err); err != nil {
 			return err
