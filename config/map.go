@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -362,6 +361,21 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		E.Src = path.Join(m.prefix, E.Src)
 	}
 
+	var uid, gid int
+	switch E.Type {
+	case
+		TypeRecursive,
+		TypeRecursiveRel,
+		TypeGlob,
+		TypeGlobRel:
+		if uid, err = e.pUser(); err != nil {
+			return err
+		}
+		if gid, err = e.pGroup(); err != nil {
+			return err
+		}
+	}
+
 	switch E.Type {
 	case
 		TypeLinkedGlob:
@@ -379,19 +393,11 @@ func (m *Map) add(e entry, fail bool, line int) error {
 	case
 		TypeRecursiveRel,
 		TypeRecursive:
-		return m.addRecursive(
-			E,
-			e.isSet(idxUser),
-			e.isSet(idxGroup),
-		)
+		return m.addRecursive(E, uid, gid)
 	case
 		TypeGlob,
 		TypeGlobRel:
-		return m.addGlob(
-			E,
-			e.isSet(idxUser),
-			e.isSet(idxGroup),
-		)
+		return m.addGlob(E, uid, gid)
 	}
 
 	if i, exists := m.m[E.Dst]; exists {
@@ -535,13 +541,9 @@ func (m *Map) includeElf(r *result) error {
 			return err
 		}
 
-		dst := v
-		dst = strings.TrimPrefix(dst, m.prefix)
-		dst = strings.TrimPrefix(dst, "/")
-
 		m.Add(Entry{
 			Src:   v,
-			Dst:   dst,
+			Dst:   clean(strings.TrimPrefix(v, m.prefix)),
 			User:  r.e.User,
 			Group: r.e.Group,
 			Mode:  0755,
@@ -598,147 +600,141 @@ func (m *Map) Merge(t *Map) error {
 	return nil
 }
 
-func (m *Map) addRecursive(e Entry, user, group bool) error {
-	var uid, gid *int
-	if user {
-		uid = &e.User
+var (
+	errModeType = errors.New("config: unsupported filemode")
+	errStatType = errors.New("config: invalid stat type")
+)
+
+func mode(f os.FileInfo) int {
+	m := f.Mode()
+	r := m.Perm()
+
+	if m&os.ModeSticky != 0 {
+		r |= modeSticky
 	}
-	if group {
-		gid = &e.Group
+	if m&os.ModeSetgid != 0 {
+		r |= modeSetgid
 	}
-	return filepath.Walk(e.Src, mapW{m, e, uid, gid, m.prefix}.walkFunc)
+	if m&os.ModeSetuid != 0 {
+		r |= modeSetuid
+	}
+	return int(r)
 }
 
-type mapW struct {
-	m      *Map
-	e      Entry
-	uid    *int
-	gid    *int
-	prefix string
-}
-
-func intPtr(i *int, d uint32) int {
-	if i != nil {
-		return *i
+func idef(i int, d uint32) int {
+	if i != -1 {
+		return i
 	}
 	return int(d)
 }
 
-func (m mapW) walkFunc(file string, info os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-
-	// archive filepath
-	af := strings.TrimPrefix(file, m.e.Src)
-	if af == "" {
-		return nil
-	}
-
-	var rf string
-	if m.e.Dst != TypeOmit {
-		rf = path.Join(m.e.Dst, af)
-	} else {
-		rf = path.Clean(af)
-	}
-
-	rf = strings.TrimPrefix(rf, m.prefix)
-	rf = strings.TrimPrefix(rf, "/")
-
+func (m *Map) auto(src, dst string, uid, gid int, info os.FileInfo) error {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
-		return fmt.Errorf("config: recursive: fileinfo not *Stat_t, %#v)", info.Sys())
+		return errStatType
 	}
 
-	if info.IsDir() {
-		m.m.Add(Entry{
-			Src:   rf,
-			Dst:   rf,
-			User:  intPtr(m.uid, stat.Uid),
-			Group: intPtr(m.gid, stat.Gid),
-			Mode:  mode(info),
-			Type:  TypeDirectory,
-		})
-		return nil
+	e := Entry{
+		Src:   src,
+		Dst:   clean(dst),
+		Mode:  mode(info),
+		User:  idef(uid, stat.Uid),
+		Group: idef(gid, stat.Gid),
 	}
 
-	if info.Mode().IsRegular() {
-		m.m.Add(Entry{
-			Src:   file,
-			Dst:   rf,
-			User:  intPtr(m.uid, stat.Uid),
-			Group: intPtr(m.gid, stat.Gid),
-			Mode:  mode(info),
-			Type:  TypeRegular,
-		})
-		return nil
-	}
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		f, err := os.Readlink(file)
+	switch info.Mode() & os.ModeType {
+	case 0:
+		e.Type = TypeRegular
+	case os.ModeDir:
+		e.Type = TypeDirectory
+	case os.ModeSymlink:
+		l, err := os.Readlink(src)
 		if err != nil {
 			return err
 		}
-
-		m.m.Add(Entry{
-			Src:   f,
-			Dst:   rf,
-			User:  intPtr(m.uid, stat.Uid),
-			Group: intPtr(m.gid, stat.Gid),
-			Mode:  0777,
-			Type:  TypeSymlink,
-		})
-		return nil
+		e.Src = l
+		e.Mode = 0777
+		e.Type = TypeSymlink
+	default:
+		return errModeType
 	}
 
-	return fmt.Errorf("config: recursive: unknown file: %s", file)
+	m.Add(e)
+	return nil
 }
 
-func (m *Map) addGlob(e Entry, user, group bool) error {
-	r, err := m.match(e.Src)
+func (m *Map) addRecursive(e Entry, uid, gid int) error {
+	src, err := m.expand(e.Src)
 	if err != nil {
 		return err
 	}
+
+	return filepath.Walk(src,
+		func(file string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if file == src {
+				return nil
+			}
+
+			f := strings.TrimPrefix(file, src)
+			if e.Dst != TypeOmit {
+				f = path.Join(e.Dst, f)
+			}
+			return m.auto(file, f, uid, gid, info)
+		},
+	)
+}
+
+func (m *Map) addGlob(e Entry, uid, gid int) error {
+	p, r, err := m.match(e.Src)
+	if err != nil {
+		return err
+	}
+
 	if Opt.Warn.EmptyGlob && len(r) < 1 {
 		log.Printf("emptyglob: %s", e.Src)
 		return nil
 	}
 
-	x := mapW{m: m, e: e, prefix: m.prefix}
-	if user {
-		x.uid = &e.User
-	}
-	if group {
-		x.gid = &e.Group
-	}
-
-	x.e.Src = ""
-
 	for _, v := range r {
-		if Opt.Glob.Expand {
-			v, err = m.expand(v)
+		var src string
+		if Opt.Glob.Expand && e.Type == TypeGlobRel {
+			src, err = m.expand(v)
 			if err != nil {
 				return err
 			}
+		} else {
+			src = v
 		}
-		s, err := os.Lstat(v)
-		if err := x.walkFunc(v, s, err); err != nil {
+
+		var dst string
+		if e.Dst != TypeOmit {
+			dst = path.Join(e.Dst, strings.TrimPrefix(v, p))
+		} else {
+			dst = strings.TrimPrefix(src, m.prefix)
+		}
+
+		l, err := os.Lstat(src)
+		if err != nil {
+			return err
+		}
+		if err := m.auto(src, dst, uid, gid, l); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
 func (m *Map) addElfGlob(e Entry) error {
-	src := path.Join(m.prefix, e.Src)
-	r, err := m.match(src)
+	_, r, err := m.match(path.Join(m.prefix, e.Src))
 	if err != nil {
 		return err
 	}
 
 	if Opt.Warn.EmptyGlob && len(r) < 1 {
-		log.Printf("emptyglob: %s", src)
+		log.Printf("emptyglob: %s", e.Src)
 		return nil
 	}
 
@@ -750,19 +746,17 @@ func (m *Map) addElfGlob(e Entry) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
 func (m *Map) addElfLib(e Entry) error {
-	var err error
-	e.Src, err = m.r.Find(e.Src)
-	if err != nil {
+	if src, err := m.r.Find(e.Src); err != nil {
 		return err
+	} else {
+		e.Src = src
+		e.Dst = clean(src)
+		return m.addElf(e)
 	}
-
-	e.Dst = clean(e.Src)
-	return m.addElf(e)
 }
 
 func (m *Map) addPath(e Entry) error {

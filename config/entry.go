@@ -218,7 +218,6 @@ func (e entry) typeOffset(i int) int {
 
 func (e entry) isSet(i int) bool {
 	i = e.typeOffset(i)
-
 	if len(e) <= i || e[i] == TypeOmit {
 		return false
 	}
@@ -227,7 +226,6 @@ func (e entry) isSet(i int) bool {
 
 func (e entry) parseIndex(i int) (int, error) {
 	i = e.typeOffset(i)
-
 	if len(e) <= i || e[i] == TypeOmit {
 		return 0, nil
 	}
@@ -243,28 +241,25 @@ func (e entry) Group() (int, error) {
 	return e.parseIndex(idxGroup)
 }
 
-func (e entry) pMode() (*int, error) {
-	if !e.isSet(e.typeOffset(idxMode)) {
-		return nil, nil
+func (e entry) pMode() (int, error) {
+	if !e.isSet(idxMode) {
+		return -1, nil
 	}
-	r, err := e.Mode()
-	return &r, err
+	return e.Mode()
 }
 
-func (e entry) pUser() (*int, error) {
-	if !e.isSet(e.typeOffset(idxUser)) {
-		return nil, nil
+func (e entry) pUser() (int, error) {
+	if !e.isSet(idxUser) {
+		return -1, nil
 	}
-	r, err := e.User()
-	return &r, err
+	return e.User()
 }
 
-func (e entry) pGroup() (*int, error) {
-	if !e.isSet(e.typeOffset(idxGroup)) {
-		return nil, nil
+func (e entry) pGroup() (int, error) {
+	if !e.isSet(idxGroup) {
+		return -1, nil
 	}
-	r, err := e.Group()
-	return &r, err
+	return e.Group()
 }
 
 func (e entry) Data() []byte {

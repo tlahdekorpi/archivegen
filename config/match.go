@@ -140,14 +140,14 @@ func (m *Map) rematch(r []elem, prefix string, f []string) (next []string, err e
 	return m.rematch(r[1:], "", next)
 }
 
-func (m *Map) match(p string) ([]string, error) {
+func (m *Map) match(p string) (string, []string, error) {
 	if strings.IndexAny(p, rechars) == -1 {
-		return []string{p}, nil
+		return "", []string{p}, nil
 	}
 
 	r, err := re(p)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	lr := len(r) == 1
@@ -155,14 +155,16 @@ func (m *Map) match(p string) ([]string, error) {
 
 	f, err := m.ls(e.p, e.re, lr, e.n)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if lr {
 		for k, v := range f {
 			f[k] = path.Join(e.p, v)
 		}
-		return f, nil
+		return e.p, f, nil
 	}
-	return m.rematch(r[1:], e.p, f)
+
+	re, err := m.rematch(r[1:], e.p, f)
+	return e.p, re, err
 }

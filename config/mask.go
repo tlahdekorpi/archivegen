@@ -217,21 +217,18 @@ func regexModeMask(e entry) (maskFunc, error) {
 		return nil, err
 	}
 
-	var (
-		mode *int
-		uid  *int
-		gid  *int
-	)
-
-	if mode, err = e.pMode(); err != nil {
+	mode, err := e.pMode()
+	if err != nil {
 		return nil, err
 	}
 
-	if uid, err = e.pUser(); err != nil {
+	uid, err := e.pUser()
+	if err != nil {
 		return nil, err
 	}
 
-	if gid, err = e.pGroup(); err != nil {
+	gid, err := e.pGroup()
+	if err != nil {
 		return nil, err
 	}
 
@@ -248,14 +245,14 @@ func regexModeMask(e entry) (maskFunc, error) {
 		if !r.MatchString(E.Dst) {
 			return false
 		}
-		if mode != nil {
-			E.Mode = *mode
+		if mode != -1 {
+			E.Mode = mode
 		}
-		if gid != nil {
-			E.Group = *gid
+		if gid != -1 {
+			E.Group = gid
 		}
-		if uid != nil {
-			E.User = *uid
+		if uid != -1 {
+			E.User = uid
 		}
 		return false
 	}, nil
