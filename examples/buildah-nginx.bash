@@ -5,14 +5,14 @@ name=nginx
 config=(
         --user 1000
         --port 8000
-        --entrypoint '["/usr/sbin/nginx"]'
+        --entrypoint '["/usr/bin/nginx"]'
 )
 
 img=$(buildah from scratch)
 dir=$(buildah mount $img)
 
-archivegen -stdout <<!archive | bsdtar xf - -C $dir
-L /usr/sbin/nginx
+archivegen <<!archive | bsdtar xf - -C $dir
+p nginx usr/bin/
 c data/html/index.html - - - hello world
 c etc/nginx/nginx.conf - - - <<!
 daemon off;

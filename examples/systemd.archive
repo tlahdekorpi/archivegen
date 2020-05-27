@@ -1,4 +1,4 @@
-# $ archivegen -X "home=$HOME" -stdout systemd.archive | bsdtar xf - -C /tmp/systemd
+# $ archivegen -X "home=$HOME" systemd.archive | bsdtar xf - -C /tmp/systemd
 # $ systemd-nspawn -bD /tmp/systemd
 
 $ home  /home/user
@@ -26,7 +26,7 @@ mc -
 # var-run-bad taint
 l ../run var/run
 # nspawn refuses to boot without
-c etc/os-release - - - -
+c etc/os-release
 
 L /usr/bin/{ls,less,cat,top}
 L $shell
@@ -51,9 +51,7 @@ StandardError=tty
 ExecStart=$shell
 !
 
-# recursively add directory only including paths containing 'xterm'
-# g /usr/share/terminfo/x/xterm* -
-mI - xterm
-R /usr/share/terminfo/x
+# include files beginning with 'xterm'
+r /usr/share/terminfo/x/^xterm -
 
 # vim: ft=sh

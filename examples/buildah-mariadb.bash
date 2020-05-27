@@ -15,7 +15,7 @@ buildah run $fimg -- dnf -y install busybox mariadb{,-server}
 
 img=$(buildah from scratch)
 dir=$(buildah mount $img)
-archivegen -rootfs "$fdir" -X "uid=$uid" -stdout mariadb.archive | bsdtar xf - -C $dir
+archivegen -rootfs "$fdir" -X "uid=$uid" mariadb.archive | bsdtar xf - -C $dir
 
 id=$(buildah umount $img)
 buildah config "${config[@]}" $id
