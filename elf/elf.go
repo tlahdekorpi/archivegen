@@ -48,7 +48,10 @@ func (f *fsfile) Dynamic() (File, error) {
 
 func (f *fsfile) Interpreter() (string, error) {
 	if f.elf == nil {
-		return f.interp, nil
+		if f.interp != "" {
+			return f.interp, nil
+		}
+		return "", errNoInterp
 	}
 
 	for _, v := range f.elf.Progs {
