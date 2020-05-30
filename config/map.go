@@ -42,6 +42,9 @@ var Opt struct {
 	Glob struct {
 		Expand bool `desc:"Resolve all symlinks for globs"`
 	}
+	File struct {
+		Expand bool `desc:"Resolve all symlinks for relative files"`
+	}
 	Path PathVar `desc:"Search path"`
 }
 
@@ -359,6 +362,15 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		TypeRecursiveRel,
 		TypeGlobRel:
 		E.Src = path.Join(m.prefix, E.Src)
+		if E.Type != TypeRegular || !Opt.File.Expand {
+			break
+		}
+		if E.Src, err = m.expand(E.Src); err != nil {
+			return err
+		}
+		if !e.isSet(idxDst) {
+			E.Dst = clean(strings.TrimPrefix(E.Src, m.prefix))
+		}
 	}
 
 	var uid, gid int

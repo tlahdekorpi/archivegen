@@ -119,6 +119,7 @@ func main() {
 	// Resolving all symlinks is required when symlinks inside the prefix
 	// lead to outside of the prefix.
 	config.Opt.Glob.Expand = true
+	config.Opt.File.Expand = true
 
 	// ELFs depending on libraries from rpath/runpath $ORIGIN will
 	// fail to resolve since the symlink is used as $ORIGIN.
