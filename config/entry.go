@@ -48,7 +48,9 @@ func (e entry) Src() (string, error) {
 	switch e.Type() {
 	case
 		TypeRegularRel,
-		TypeRegular:
+		TypeRegular,
+		TypeAutoRel,
+		TypeAuto:
 		if len(e) < 2 {
 			break
 		}
@@ -115,7 +117,9 @@ func (e entry) Dst() (string, error) {
 
 	case
 		TypeRegularRel,
-		TypeRegular:
+		TypeRegular,
+		TypeAutoRel,
+		TypeAuto:
 		// invalid entry
 		if len(e) < 2 {
 			break

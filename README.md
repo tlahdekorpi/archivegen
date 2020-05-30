@@ -40,7 +40,7 @@ d a/b/c 0700 1 1
 l busybox usr/bin/sh
 ```
 
-**`f, fr`** File
+**`f, fr, a, ar`** File/Auto
 ```sh
 # f *src dst mode uid gid
 f /a/b/c/file foo/bar/baz

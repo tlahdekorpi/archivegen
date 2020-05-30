@@ -50,6 +50,8 @@ var Opt struct {
 
 const (
 	TypeOmit         = "-"
+	TypeAuto         = "a"
+	TypeAutoRel      = "ar"
 	TypeDirectory    = "d"
 	TypeRecursive    = "R"
 	TypeRecursiveRel = "Rr"
@@ -358,11 +360,9 @@ func (m *Map) add(e entry, fail bool, line int) error {
 	case TypeRegularRel:
 		E.Type = TypeRegular
 		fallthrough
-	case
-		TypeRecursiveRel,
-		TypeGlobRel:
+	case TypeAutoRel:
 		E.Src = path.Join(m.prefix, E.Src)
-		if E.Type != TypeRegular || !Opt.File.Expand {
+		if !Opt.File.Expand {
 			break
 		}
 		if E.Src, err = m.expand(E.Src); err != nil {
@@ -371,10 +371,21 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		if !e.isSet(idxDst) {
 			E.Dst = clean(strings.TrimPrefix(E.Src, m.prefix))
 		}
+	case
+		TypeRecursiveRel,
+		TypeGlobRel:
+		E.Src = path.Join(m.prefix, E.Src)
 	}
 
-	var uid, gid int
+	var uid, gid, mode int
 	switch E.Type {
+	case
+		TypeAuto,
+		TypeAutoRel:
+		if mode, err = e.pMode(); err != nil {
+			return err
+		}
+		fallthrough
 	case
 		TypeRecursive,
 		TypeRecursiveRel,
@@ -410,6 +421,10 @@ func (m *Map) add(e entry, fail bool, line int) error {
 		TypeGlob,
 		TypeGlobRel:
 		return m.addGlob(E, uid, gid)
+	case
+		TypeAuto,
+		TypeAutoRel:
+		return m.addAuto(E, uid, gid, mode)
 	}
 
 	if i, exists := m.m[E.Dst]; exists {
@@ -617,7 +632,7 @@ var (
 	errStatType = errors.New("config: invalid stat type")
 )
 
-func mode(f os.FileInfo) int {
+func fmode(f os.FileInfo) uint32 {
 	m := f.Mode()
 	r := m.Perm()
 
@@ -630,7 +645,7 @@ func mode(f os.FileInfo) int {
 	if m&os.ModeSetuid != 0 {
 		r |= modeSetuid
 	}
-	return int(r)
+	return uint32(r)
 }
 
 func idef(i int, d uint32) int {
@@ -640,7 +655,7 @@ func idef(i int, d uint32) int {
 	return int(d)
 }
 
-func (m *Map) auto(src, dst string, uid, gid int, info os.FileInfo) error {
+func (m *Map) auto(src, dst string, uid, gid, mode int, info os.FileInfo) error {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return errStatType
@@ -649,7 +664,7 @@ func (m *Map) auto(src, dst string, uid, gid int, info os.FileInfo) error {
 	e := Entry{
 		Src:   src,
 		Dst:   clean(dst),
-		Mode:  mode(info),
+		Mode:  idef(mode, fmode(info)),
 		User:  idef(uid, stat.Uid),
 		Group: idef(gid, stat.Gid),
 	}
@@ -675,6 +690,14 @@ func (m *Map) auto(src, dst string, uid, gid int, info os.FileInfo) error {
 	return nil
 }
 
+func (m *Map) addAuto(e Entry, uid, gid, mode int) error {
+	if l, err := os.Lstat(e.Src); err != nil {
+		return err
+	} else {
+		return m.auto(e.Src, e.Dst, uid, gid, mode, l)
+	}
+}
+
 func (m *Map) addRecursive(e Entry, uid, gid int) error {
 	src, err := m.expand(e.Src)
 	if err != nil {
@@ -694,7 +717,7 @@ func (m *Map) addRecursive(e Entry, uid, gid int) error {
 			if e.Dst != TypeOmit {
 				f = path.Join(e.Dst, f)
 			}
-			return m.auto(file, f, uid, gid, info)
+			return m.auto(file, f, uid, gid, -1, info)
 		},
 	)
 }
@@ -732,7 +755,7 @@ func (m *Map) addGlob(e Entry, uid, gid int) error {
 		if err != nil {
 			return err
 		}
-		if err := m.auto(src, dst, uid, gid, l); err != nil {
+		if err := m.auto(src, dst, uid, gid, -1, l); err != nil {
 			return err
 		}
 	}
