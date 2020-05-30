@@ -100,14 +100,16 @@ func (m *Map) ls(p string, re *regexp.Regexp, dir, ne bool) ([]string, error) {
 		} else {
 			m = re.MatchString(v)
 		}
-		if m {
-			vs, err := os.Lstat(path.Join(rp, v))
-			if err != nil {
-				continue
-			}
-			if dir && vs.IsDir() {
-				continue
-			}
+		if !m {
+			continue
+		}
+		vs, err := os.Lstat(path.Join(rp, v))
+		if err != nil {
+			continue
+		}
+		if id := vs.IsDir(); id {
+			r = append(r, v)
+		} else if !id && dir {
 			r = append(r, v)
 		}
 	}
