@@ -2,24 +2,18 @@ package cpio
 
 import (
 	"io"
+	"os"
 
 	"github.com/tlahdekorpi/archivegen/archive"
 	"github.com/tlahdekorpi/archivegen/cpio"
 )
 
-const max32 = int64(^uint32(0))
-
 type writer struct {
 	cw *cpio.Writer
-	t  bool
 }
 
-func NewWriter(w io.Writer, timestamp bool) archive.Writer {
-	cw := cpio.NewWriter(w)
-	return &writer{
-		cw: cw,
-		t:  timestamp,
-	}
+func NewWriter(w io.Writer) archive.Writer {
+	return &writer{cw: cpio.NewWriter(w)}
 }
 
 func (w *writer) Close() error {
@@ -28,6 +22,10 @@ func (w *writer) Close() error {
 
 func (w *writer) Write(b []byte) (int, error) {
 	return w.cw.Write(b)
+}
+
+func (w *writer) WriteFile(file *os.File, hdr *archive.Header) error {
+	return w.cw.WriteFile(file, hdrconv(hdr))
 }
 
 func typeconv(t archive.FileType) int {
@@ -46,24 +44,20 @@ func typeconv(t archive.FileType) int {
 		return cpio.TypeSymlink
 	case archive.TypeSocket:
 		return cpio.TypeSocket
-	default:
-		panic("unknown type " + t.String())
 	}
-
+	panic("type")
 }
 
-func hdrconv(a *archive.Header, t bool) *cpio.Header {
-	if t && a.Type == archive.TypeRegular {
-		a.Time = a.ModTime.Unix()
-	}
+func hdrconv(a *archive.Header) *cpio.Header {
+	const max = int64(^uint32(0))
 
-	if a.Size >= max32 {
+	if a.Size >= max {
 		panic("filesize " + a.Name)
 	}
-	if a.Mode >= max32 {
+	if a.Mode >= max {
 		panic("filemode " + a.Name)
 	}
-	if a.Time >= max32 {
+	if a.Time >= max {
 		panic("mtime " + a.Name)
 	}
 
@@ -82,7 +76,7 @@ func (w *writer) WriteHeader(hdr *archive.Header) error {
 	if hdr.Type == archive.TypeDir {
 		hdr.Name += "/"
 	}
-	return w.cw.WriteHeader(hdrconv(hdr, w.t))
+	return w.cw.WriteHeader(hdrconv(hdr))
 }
 
 func (w *writer) Symlink(src, dst string, uid, gid, mode int) error {

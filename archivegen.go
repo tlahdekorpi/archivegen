@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -101,9 +102,9 @@ type opts struct {
 	Print         bool   `desc:"Print the resolved tree in archivegen format"`
 	Rootfs        string `desc:"Alternate root for relative and ELF types"`
 	Stdout        bool   `desc:"Write archive to stdout"`
-	Timestamp     bool   `desc:"Preserve file timestamps"`
 	Version       bool   `desc:"Version information"`
 	Ldconf        string `desc:"Path to ld.so.conf" flag:"ld.so.conf"`
+	Size          int    `desc:"Buffer size"`
 }
 
 func main() {
@@ -113,6 +114,7 @@ func main() {
 	opt := opts{
 		Format: "tar",
 		Ldconf: "/etc/ld.so.conf",
+		Size:   1 << 22,
 	}
 	buildflags(&opt, "")
 
@@ -190,14 +192,23 @@ func main() {
 		log.Fatal("stdout is terminal, use -stdout")
 	}
 
-	buf := bufio.NewWriterSize(out, 1<<24)
+	var (
+		wr  io.Writer = out
+		buf *bufio.Writer
+	)
+	if opt.Size > 0 {
+		buf = bufio.NewWriterSize(out, opt.Size)
+		wr = buf
+	} else {
+		buf = new(bufio.Writer)
+	}
 
 	var in archive.Writer
 	switch opt.Format {
 	case "tar":
-		in = tar.NewWriter(buf, opt.Timestamp)
+		in = tar.NewWriter(wr)
 	case "cpio":
-		in = cpio.NewWriter(buf, opt.Timestamp)
+		in = cpio.NewWriter(wr)
 	default:
 		log.Fatalln("invalid format:", opt.Format)
 	}

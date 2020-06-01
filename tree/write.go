@@ -3,7 +3,6 @@ package tree
 import (
 	"encoding/base64"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/tlahdekorpi/archivegen/archive"
@@ -11,67 +10,43 @@ import (
 )
 
 func writeFile(w archive.Writer, src, dst string, mode, uid, gid int, time int64) error {
-	l, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	m := int64(l.Mode().Perm())
-	if mode != 0 {
-		m = int64(mode)
-	}
-
-	t, err := statt(l)
-	if err != nil {
-		return err
-	}
-
-	hdr := &archive.Header{
-		Name:       dst,
-		Size:       int64(l.Size()),
-		Mode:       int64(m),
-		Uid:        uid,
-		Gid:        gid,
-		Type:       archive.TypeRegular,
-		Time:       time,
-		ModTime:    l.ModTime(),
-		ChangeTime: t.ctime,
-		AccessTime: t.atime,
-	}
-	if err := w.WriteHeader(hdr); err != nil {
-		return err
-	}
-
 	f, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(w, f); err != nil {
+	fs, err := f.Stat()
+	if err != nil {
 		return err
 	}
 
-	return nil
+	return w.WriteFile(f,
+		&archive.Header{
+			Name: dst,
+			Size: int64(fs.Size()),
+			Mode: int64(mode),
+			Uid:  uid,
+			Gid:  gid,
+			Type: archive.TypeRegular,
+			Time: time,
+		},
+	)
 }
 
 func writeDir(w archive.Writer, dst string, mode, uid, gid int) error {
-	hdr := &archive.Header{
+	return w.WriteHeader(&archive.Header{
 		Name: dst,
 		Size: 0,
 		Mode: int64(mode),
 		Uid:  uid,
 		Gid:  gid,
 		Type: archive.TypeDir,
-	}
-	if err := w.WriteHeader(hdr); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte, time int64) error {
-	hdr := &archive.Header{
+	if err := w.WriteHeader(&archive.Header{
 		Name: dst,
 		Size: int64(len(data)),
 		Mode: int64(mode),
@@ -79,16 +54,11 @@ func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte, t
 		Gid:  gid,
 		Type: archive.TypeRegular,
 		Time: time,
-	}
-	if err := w.WriteHeader(hdr); err != nil {
+	}); err != nil {
 		return err
 	}
-
-	if _, err := w.Write(data); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := w.Write(data)
+	return err
 }
 
 func Write(e config.Entry, w archive.Writer) error {

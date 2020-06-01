@@ -2,6 +2,7 @@ package tar
 
 import (
 	"io"
+	"os"
 	"time"
 
 	"archive/tar"
@@ -11,15 +12,10 @@ import (
 
 type writer struct {
 	tw *tar.Writer
-	t  bool
 }
 
-func NewWriter(w io.Writer, timestamp bool) archive.Writer {
-	tw := tar.NewWriter(w)
-	return &writer{
-		tw: tw,
-		t:  timestamp,
-	}
+func NewWriter(w io.Writer) archive.Writer {
+	return &writer{tw: tar.NewWriter(w)}
 }
 
 func (w *writer) Close() error {
@@ -28,6 +24,14 @@ func (w *writer) Close() error {
 
 func (w *writer) Write(b []byte) (int, error) {
 	return w.tw.Write(b)
+}
+
+func (w *writer) WriteFile(file *os.File, hdr *archive.Header) error {
+	if err := w.WriteHeader(hdr); err != nil {
+		return err
+	}
+	_, err := io.Copy(w.tw, file)
+	return err
 }
 
 func typeconv(t archive.FileType) byte {
@@ -44,13 +48,11 @@ func typeconv(t archive.FileType) byte {
 		return tar.TypeReg
 	case archive.TypeSymlink:
 		return tar.TypeSymlink
-	default:
-		panic("unknown type " + t.String())
 	}
-
+	panic("type")
 }
 
-func hdrconv(a *archive.Header, t bool) *tar.Header {
+func hdrconv(a *archive.Header) *tar.Header {
 	r := &tar.Header{
 		Name:     a.Name,
 		Uid:      a.Uid,
@@ -61,14 +63,6 @@ func hdrconv(a *archive.Header, t bool) *tar.Header {
 	}
 	if a.Time > 0 {
 		r.ModTime = time.Unix(a.Time, 0)
-		r.ChangeTime = time.Unix(a.Time, 0)
-		r.AccessTime = time.Unix(a.Time, 0)
-		return r
-	}
-	if t && a.Type == archive.TypeRegular {
-		r.ModTime = a.ModTime
-		r.ChangeTime = a.ChangeTime
-		r.AccessTime = a.AccessTime
 	}
 	return r
 }
@@ -77,7 +71,7 @@ func (w *writer) WriteHeader(hdr *archive.Header) error {
 	if hdr.Type == archive.TypeDir {
 		hdr.Name += "/"
 	}
-	return w.tw.WriteHeader(hdrconv(hdr, w.t))
+	return w.tw.WriteHeader(hdrconv(hdr))
 }
 
 func (w *writer) Symlink(src, dst string, uid, gid, mode int) error {
