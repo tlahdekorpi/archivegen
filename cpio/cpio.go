@@ -7,6 +7,7 @@ package cpio
 import (
 	"errors"
 	"io"
+	"os"
 )
 
 var (
@@ -36,6 +37,8 @@ const (
 )
 
 var zeroBlock [zsize]byte
+
+var Pad bool
 
 type Header struct {
 	Mode     int    // permission and mode bits.
@@ -152,6 +155,16 @@ func (cw *Writer) WriteHeader(hdr *Header) error {
 	cw.remaining = hdr.Size
 
 	return cw.pad(4)
+}
+
+func (cw *Writer) writeFile(file *os.File, hdr *Header) error {
+	if err := cw.WriteHeader(hdr); err != nil {
+		return err
+	}
+	n, err := io.Copy(cw.w, file)
+	cw.length += int64(n)
+	cw.remaining -= int64(n)
+	return err
 }
 
 func (cw *Writer) zeros(l int64) error {

@@ -2,17 +2,8 @@
 
 package cpio
 
-import (
-	"io"
-	"os"
-)
+import "os"
 
 func (cw *Writer) WriteFile(file *os.File, hdr *Header) error {
-	if err := cw.WriteHeader(hdr); err != nil {
-		return err
-	}
-	n, err := io.Copy(cw.w, file)
-	cw.length += int64(n)
-	cw.remaining -= int64(n)
-	return err
+	return cw.writeFile(file, hdr)
 }

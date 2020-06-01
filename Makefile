@@ -14,7 +14,7 @@ default: archivegen
 all: test archivegen
 
 archivegen:
-	go build -ldflags "-X main.buildversion=$(VERSION)" $(BUILDFLAGS)
+	go build -tags copy_file_range -ldflags "-X main.buildversion=cfr+$(VERSION)" $(BUILDFLAGS)
 
 test:
 	go test $(PKGS)

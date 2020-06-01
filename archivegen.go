@@ -15,6 +15,7 @@ import (
 
 	"github.com/tlahdekorpi/archivegen/archive"
 	"github.com/tlahdekorpi/archivegen/config"
+	"github.com/tlahdekorpi/archivegen/cpio"
 	"github.com/tlahdekorpi/archivegen/elf"
 )
 
@@ -103,6 +104,7 @@ type opts struct {
 	Version       bool   `desc:"Version information"`
 	Ldconf        string `desc:"Path to ld.so.conf" flag:"ld.so.conf"`
 	Size          int    `desc:"Buffer size"`
+	Pad           bool   `desc:"Pad headers to 4k align files, implies size=0"`
 }
 
 func main() {
@@ -190,6 +192,11 @@ func main() {
 		out = open(opt.Out)
 	} else if stdout && !opt.Stdout {
 		log.Fatal("stdout is terminal, use -stdout")
+	}
+
+	if opt.Pad {
+		opt.Size = 0
+		cpio.Pad = true
 	}
 
 	var (
