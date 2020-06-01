@@ -1,8 +1,11 @@
 package archive
 
 import (
+	"archive/tar"
 	"io"
 	"os"
+
+	"github.com/tlahdekorpi/archivegen/cpio"
 )
 
 type FileType int
@@ -32,4 +35,14 @@ type Writer interface {
 	WriteHeader(hdr *Header) error
 	Symlink(src, dst string, uid, gid, mode int) error
 	WriteFile(file *os.File, hdr *Header) error
+}
+
+func NewWriter(format string, w io.Writer) Writer {
+	switch format {
+	case "tar":
+		return &tarWriter{tar.NewWriter(w)}
+	case "cpio":
+		return &cpioWriter{cpio.NewWriter(w)}
+	}
+	return nil
 }

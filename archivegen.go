@@ -14,8 +14,6 @@ import (
 	"unsafe"
 
 	"github.com/tlahdekorpi/archivegen/archive"
-	"github.com/tlahdekorpi/archivegen/archive/cpio"
-	"github.com/tlahdekorpi/archivegen/archive/tar"
 	"github.com/tlahdekorpi/archivegen/config"
 	"github.com/tlahdekorpi/archivegen/elf"
 )
@@ -202,14 +200,9 @@ func main() {
 		buf = new(bufio.Writer)
 	}
 
-	var in archive.Writer
-	switch opt.Format {
-	case "tar":
-		in = tar.NewWriter(wr)
-	case "cpio":
-		in = cpio.NewWriter(wr)
-	default:
-		log.Fatalln("invalid format:", opt.Format)
+	in := archive.NewWriter(opt.Format, wr)
+	if in == nil {
+		log.Fatalln("unknown format:", opt.Format)
 	}
 
 	if err := root.Write("", in); err != nil {

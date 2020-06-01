@@ -1,4 +1,4 @@
-package tar
+package archive
 
 import (
 	"io"
@@ -6,27 +6,21 @@ import (
 	"time"
 
 	"archive/tar"
-
-	"github.com/tlahdekorpi/archivegen/archive"
 )
 
-type writer struct {
+type tarWriter struct {
 	tw *tar.Writer
 }
 
-func NewWriter(w io.Writer) archive.Writer {
-	return &writer{tw: tar.NewWriter(w)}
-}
-
-func (w *writer) Close() error {
+func (w *tarWriter) Close() error {
 	return w.tw.Close()
 }
 
-func (w *writer) Write(b []byte) (int, error) {
+func (w *tarWriter) Write(b []byte) (int, error) {
 	return w.tw.Write(b)
 }
 
-func (w *writer) WriteFile(file *os.File, hdr *archive.Header) error {
+func (w *tarWriter) WriteFile(file *os.File, hdr *Header) error {
 	if err := w.WriteHeader(hdr); err != nil {
 		return err
 	}
@@ -34,32 +28,32 @@ func (w *writer) WriteFile(file *os.File, hdr *archive.Header) error {
 	return err
 }
 
-func typeconv(t archive.FileType) byte {
+func tarType(t FileType) byte {
 	switch t {
-	case archive.TypeDir:
+	case TypeDir:
 		return tar.TypeDir
-	case archive.TypeFifo:
+	case TypeFifo:
 		return tar.TypeFifo
-	case archive.TypeChar:
+	case TypeChar:
 		return tar.TypeChar
-	case archive.TypeBlock:
+	case TypeBlock:
 		return tar.TypeBlock
-	case archive.TypeRegular:
+	case TypeRegular:
 		return tar.TypeReg
-	case archive.TypeSymlink:
+	case TypeSymlink:
 		return tar.TypeSymlink
 	}
 	panic("type")
 }
 
-func hdrconv(a *archive.Header) *tar.Header {
+func tarHeader(a *Header) *tar.Header {
 	r := &tar.Header{
 		Name:     a.Name,
 		Uid:      a.Uid,
 		Gid:      a.Gid,
 		Size:     a.Size,
 		Mode:     a.Mode,
-		Typeflag: typeconv(a.Type),
+		Typeflag: tarType(a.Type),
 	}
 	if a.Time > 0 {
 		r.ModTime = time.Unix(a.Time, 0)
@@ -67,14 +61,14 @@ func hdrconv(a *archive.Header) *tar.Header {
 	return r
 }
 
-func (w *writer) WriteHeader(hdr *archive.Header) error {
-	if hdr.Type == archive.TypeDir {
+func (w *tarWriter) WriteHeader(hdr *Header) error {
+	if hdr.Type == TypeDir {
 		hdr.Name += "/"
 	}
-	return w.tw.WriteHeader(hdrconv(hdr))
+	return w.tw.WriteHeader(tarHeader(hdr))
 }
 
-func (w *writer) Symlink(src, dst string, uid, gid, mode int) error {
+func (w *tarWriter) Symlink(src, dst string, uid, gid, mode int) error {
 	hdr := &tar.Header{
 		Name:     dst,
 		Linkname: src,
