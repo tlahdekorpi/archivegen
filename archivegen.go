@@ -18,7 +18,6 @@ import (
 	"github.com/tlahdekorpi/archivegen/archive/tar"
 	"github.com/tlahdekorpi/archivegen/config"
 	"github.com/tlahdekorpi/archivegen/elf"
-	"github.com/tlahdekorpi/archivegen/tree"
 )
 
 var buildversion string = "v0"
@@ -41,7 +40,7 @@ func open(file string) *os.File {
 	return r
 }
 
-func loadTree(c *config.Config, files []string, stdin bool) (*tree.Node, error) {
+func loadTree(c *config.Config, files []string, stdin bool) (*archive.Node, error) {
 	var m1, m2 *config.Map
 	var err error
 
@@ -66,7 +65,7 @@ func loadTree(c *config.Config, files []string, stdin bool) (*tree.Node, error) 
 		return nil, err
 	}
 
-	t := tree.Render(m1)
+	t := archive.Render(m1)
 	if len(t.Map) == 0 {
 		return nil, fmt.Errorf("empty archive")
 	}
@@ -74,7 +73,7 @@ func loadTree(c *config.Config, files []string, stdin bool) (*tree.Node, error) 
 	return t, nil
 }
 
-func printTree(t *tree.Node, b64 bool) {
+func printTree(t *archive.Node, b64 bool) {
 	tw := tabwriter.NewWriter(os.Stdout, 1, 1, 2, ' ', 0)
 	t.Print("", tw, os.Stdout, b64)
 	tw.Flush()

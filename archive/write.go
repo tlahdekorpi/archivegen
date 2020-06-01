@@ -1,15 +1,14 @@
-package tree
+package archive
 
 import (
 	"encoding/base64"
 	"fmt"
 	"os"
 
-	"github.com/tlahdekorpi/archivegen/archive"
 	"github.com/tlahdekorpi/archivegen/config"
 )
 
-func writeFile(w archive.Writer, src, dst string, mode, uid, gid int, time int64) error {
+func writeFile(w Writer, src, dst string, mode, uid, gid int, time int64) error {
 	f, err := os.Open(src)
 	if err != nil {
 		return err
@@ -22,37 +21,37 @@ func writeFile(w archive.Writer, src, dst string, mode, uid, gid int, time int64
 	}
 
 	return w.WriteFile(f,
-		&archive.Header{
+		&Header{
 			Name: dst,
 			Size: int64(fs.Size()),
 			Mode: int64(mode),
 			Uid:  uid,
 			Gid:  gid,
-			Type: archive.TypeRegular,
+			Type: TypeRegular,
 			Time: time,
 		},
 	)
 }
 
-func writeDir(w archive.Writer, dst string, mode, uid, gid int) error {
-	return w.WriteHeader(&archive.Header{
+func writeDir(w Writer, dst string, mode, uid, gid int) error {
+	return w.WriteHeader(&Header{
 		Name: dst,
 		Size: 0,
 		Mode: int64(mode),
 		Uid:  uid,
 		Gid:  gid,
-		Type: archive.TypeDir,
+		Type: TypeDir,
 	})
 }
 
-func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte, time int64) error {
-	if err := w.WriteHeader(&archive.Header{
+func createFile(w Writer, dst string, mode, uid, gid int, data []byte, time int64) error {
+	if err := w.WriteHeader(&Header{
 		Name: dst,
 		Size: int64(len(data)),
 		Mode: int64(mode),
 		Uid:  uid,
 		Gid:  gid,
-		Type: archive.TypeRegular,
+		Type: TypeRegular,
 		Time: time,
 	}); err != nil {
 		return err
@@ -61,7 +60,7 @@ func createFile(w archive.Writer, dst string, mode, uid, gid int, data []byte, t
 	return err
 }
 
-func Write(e config.Entry, w archive.Writer) error {
+func Write(e config.Entry, w Writer) error {
 	switch e.Type {
 	case config.TypeRegular:
 		return writeFile(w, e.Src, e.Dst, e.Mode, e.User, e.Group, e.Time)

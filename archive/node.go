@@ -1,12 +1,12 @@
-package tree
+package archive
 
 import (
 	"fmt"
 	"io"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
-	"github.com/tlahdekorpi/archivegen/archive"
 	"github.com/tlahdekorpi/archivegen/config"
 )
 
@@ -15,12 +15,7 @@ type Node struct {
 	E   config.Entry
 }
 
-type Writer interface {
-	io.Writer
-	Flush() error
-}
-
-func (n *Node) Print(p string, w Writer, bw io.Writer, b64 bool) {
+func (n *Node) Print(p string, w *tabwriter.Writer, bw io.Writer, b64 bool) {
 	var (
 		d []string
 		m []string
@@ -101,7 +96,7 @@ func mapsort(m map[string]*Node) []string {
 	return r
 }
 
-func (n *Node) Write(p string, w archive.Writer) error {
+func (n *Node) Write(p string, w Writer) error {
 	d := make([]string, 0)
 
 	// write all non-directories
