@@ -91,6 +91,7 @@ func (v *varValue) Set(val string) error {
 }
 
 type opts struct {
+	Hardlink      bool   `desc:"Symlink hardlinks"`
 	ArchiveFormat bool   `desc:"Archive configuration file format" flag:"format"`
 	Base64        bool   `desc:"Base64 encode all create types" flag:"b64"`
 	Chdir         string `desc:"Change directory before doing anything" flag:"C"`
@@ -137,6 +138,8 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	archive.Hardlink = opt.Hardlink
 
 	c := &config.Config{
 		Resolver: elf.NewResolver(opt.Rootfs),

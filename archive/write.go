@@ -3,10 +3,31 @@ package archive
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"syscall"
 
 	"github.com/tlahdekorpi/archivegen/config"
 )
+
+var Hardlink bool
+
+type dinode struct {
+	dev uint64
+	ino uint64
+}
+
+var inomap = make(map[dinode]string)
+
+func patheq(a, b string) string {
+	p1, f := filepath.Split(a)
+	p2, _ := filepath.Split(b)
+	if p1 == p2 {
+		return f
+	}
+	return "/" + a
+}
 
 func writeFile(w Writer, src, dst string, mode, uid, gid int, time int64) error {
 	f, err := os.Open(src)
@@ -18,6 +39,17 @@ func writeFile(w Writer, src, dst string, mode, uid, gid int, time int64) error 
 	fs, err := f.Stat()
 	if err != nil {
 		return err
+	}
+
+	if Hardlink {
+		if s, ok := fs.Sys().(*syscall.Stat_t); ok && s.Nlink > 1 {
+			if st, ok := inomap[dinode{s.Dev, s.Ino}]; ok {
+				log.Printf("hardlink: %s -> %s", dst, patheq(st, dst))
+				return w.Symlink(patheq(st, dst), dst, uid, gid, 0777)
+			} else {
+				inomap[dinode{s.Dev, s.Ino}] = dst
+			}
+		}
 	}
 
 	return w.WriteFile(f,
