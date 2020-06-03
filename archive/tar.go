@@ -8,6 +8,8 @@ import (
 	"archive/tar"
 )
 
+var Pad bool
+
 type tarWriter struct {
 	tw *tar.Writer
 }
@@ -20,7 +22,7 @@ func (w *tarWriter) Write(b []byte) (int, error) {
 	return w.tw.Write(b)
 }
 
-func (w *tarWriter) WriteFile(file *os.File, hdr *Header) error {
+func (w *tarWriter) writeFile(file *os.File, hdr *Header) error {
 	if err := w.WriteHeader(hdr); err != nil {
 		return err
 	}

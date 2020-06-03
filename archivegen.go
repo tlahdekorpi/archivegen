@@ -197,6 +197,7 @@ func main() {
 	if opt.Pad {
 		opt.Size = 0
 		cpio.Pad = true
+		archive.Pad = true
 	}
 
 	var (
